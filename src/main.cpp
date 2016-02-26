@@ -63,10 +63,15 @@ using std::endl;
 #include "TestSymmetry.hpp"
 #include "TestNorms.hpp"
 #include <hcsparse.h>
+#include <sys/time.h>
 
 extern double spmv_time;
 extern double* host_alpha;
 extern double* host_beta;
+
+extern double *val;
+extern int *col, *rowoff;
+extern ulong *rowBlocks;
 
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
@@ -79,8 +84,8 @@ extern double* host_beta;
 */
 int main(int argc, char * argv[]) {
 
-clock_t begin, end;
-begin = clock();
+  struct timeval start, stop;
+  gettimeofday(&start, NULL);
 
 #ifndef HPCG_NO_MPI
   MPI_Init(&argc, &argv);
@@ -378,6 +383,10 @@ begin = clock();
   DeleteVector(b_computed);
   delete [] testnorms_data.values;
 
+  delete [] val;
+  delete [] col;
+  delete [] rowoff;
+  delete [] rowBlocks;
   delete [] host_alpha;
   delete [] host_beta;
   hcsparseTeardown();
@@ -388,8 +397,8 @@ begin = clock();
 #ifndef HPCG_NO_MPI
   MPI_Finalize();
 #endif
-  end = clock();
-  std::cerr << "\n SPMV time:" << spmv_time;
-  std::cerr << "\n Total time:" << (double)(end - begin) / CLOCKS_PER_SEC ;
+  gettimeofday(&stop, NULL);
+  std::cout << "\n SPMV time:" << spmv_time;
+  std::cout << "\n Total time:" << (((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0;
   return 0;
 }

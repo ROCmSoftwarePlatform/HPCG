@@ -33,6 +33,7 @@
 #include <cassert>
 #include <time.h>
 #include <hcsparse.h>
+#inckude <sys/time.h>
   
 hcsparseCsrMatrix gCsrMat;
 hcdenseVector gX;
@@ -42,6 +43,10 @@ hcsparseScalar gBeta;
 hcsparseStatus status;
 double *host_alpha;
 double *host_beta;
+
+double *val;
+int *col, *rowoff;
+ulong *rowBlocks;
   
 std::vector<Concurrency::accelerator>acc = Concurrency::accelerator::get_all();
 accelerator_view accl_view = (acc[1].create_view()); 
@@ -50,7 +55,7 @@ hcsparseControl control(accl_view);
 
 double spmv_time;
 
-int hcsparse_setup()
+int hcsparse_setup(const SparseMatrix h_A)
 {
   host_alpha = new double[1];
   host_beta = new double[1];
@@ -72,6 +77,11 @@ int hcsparse_setup()
   gCsrMat.offValues = 0;
   gCsrMat.offColInd = 0;
   gCsrMat.offRowOff = 0;
+
+  val = new double[h_A.localNumberOfNonzeros];
+  col = new int[h_A.localNumberOfNonzeros];
+  rowoff = new int[h_A.localNumberOfRows + 1];
+  rowBlocks = new ulong[h_A.localNumberOfNonzeros];
     
   return 0;
 }
@@ -81,7 +91,7 @@ int hcsparse_csrmv_adaptive(const SparseMatrix & h_A, Vector & h_x, Vector & h_y
   static int call_no;
   if (!call_no)
   {
-    hcsparse_setup();
+    hcsparse_setup(h_A);
     ++call_no;
   }
  
@@ -106,12 +116,6 @@ int hcsparse_csrmv_adaptive(const SparseMatrix & h_A, Vector & h_x, Vector & h_y
   
   gX.num_values = num_col;
   gY.num_values = num_row;
-  
-  ulong *rowBlocks = new ulong[num_nonzero];
-  
-  double *val = new double[h_A.localNumberOfNonzeros];
-  int *col = new int[h_A.localNumberOfNonzeros];
-  int *rowoff = new int[h_A.localNumberOfRows + 1];
   
   int k = 0;
   rowoff[0] = 0;
@@ -175,8 +179,8 @@ int hcsparse_csrmv_adaptive(const SparseMatrix & h_A, Vector & h_x, Vector & h_y
   @see ComputeSPMV
 */
 int ComputeSPMV_ref( const SparseMatrix & A, Vector & x, Vector & y) {
-  clock_t begin, end;
-  begin = clock();
+  struct timeval start, stop;
+  gettimeofday(&start, NULL);
   
   assert(x.localLength>=A.localNumberOfColumns); // Test vector lengths
   assert(y.localLength>=A.localNumberOfRows);
@@ -224,8 +228,8 @@ int ComputeSPMV_ref( const SparseMatrix & A, Vector & x, Vector & y) {
         }
   }*/
   
-  end = clock();
-  spmv_time += (double) (end - begin) / CLOCKS_PER_SEC;
+  gettimeofday(&stop, NULL);
+  spmv_time += ((((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0);
   
   return 0;
 }
