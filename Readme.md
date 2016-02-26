@@ -32,7 +32,7 @@ export CLAMP_NOTILECHECK=ON
 ### Pre-requisites ###
 * Download [clSPARSE](https://github.com/clMathLibraries/clSPARSE/releases/download/0.8.1.0/clSPARSE­0.8.
 1.0­Linux­x64.tar.gz) for linux. 
-* Update the clSPARSE include and library path in Makefile.Linux_Serial. (for ex. -­I /path/to/clsparse/include -L /path/to/clsparse/lib64) 
+* Update the clSPARSE include and library path in Makefile.Linux_Serial in the setup directory. (for ex. -­I /path/to/clsparse/include -L /path/to/clsparse/lib64) 
 * Add path to clSPARSE library to LD_LIBRARY_PATH in the terminal. 
 (example)
 
@@ -42,7 +42,7 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/clsparse/lib64
 
 ```
 * [OpenCL SDK](http://developer.amd.com/tools-and-sdks/opencl-zone/amd-accelerated-parallel-processing-app-sdk/). 
-* Update OpenCL include and library path in Makefile.Linux_Serial.          (for ex. -­I /opt/AMDAPPSDK­3.0/include/  -­L  /opt/AMDAPPSDK­3.0/lib/x86_64/) 
+* Update OpenCL include and library path in Makefile.Linux_Serial in the setup directory.          (for ex. -­I /opt/AMDAPPSDK­3.0/include/  -­L  /opt/AMDAPPSDK­3.0/lib/x86_64/) 
 
 ### Steps to build and run HPCG###
 * Inside HPCG root directory,
@@ -60,4 +60,4 @@ export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/path/to/clsparse/lib64
 output validation. At the end of the file it would have been reported whether the exeution 
 was valid. 
 
-Additional instructions to configure and build are available in the root directory. 
+Additional instructions to configure and build are available in the root directory.
