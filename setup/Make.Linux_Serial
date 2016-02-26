@@ -116,11 +116,11 @@ HPCG_DEFS     = $(HPCG_OPTS) $(HPCG_INCLUDES)
 # - Compilers / linkers - Optimization flags ---------------------------
 # ----------------------------------------------------------------------
 #
-CXX          = /usr/bin/g++
-CXXFLAGS     = $(HPCG_DEFS) -fomit-frame-pointer -O3 -funroll-loops -W -Wall -pedantic
-#
+#CXX          = /usr/bin/g++
+CXX          = clang++
+CXXFLAGS     =  $(HPCG_DEFS)  -O3 -funroll-loops -W -Wall -pedantic -fomit-frame-pointer `clamp-config --cxxflags`
 LINKER       = $(CXX)
-LINKFLAGS    = $(CXXFLAGS)
+LINKFLAGS    = $(CXXFLAGS) `clamp-config --ldflags` -lhcsparse
 #
 ARCHIVER     = ar
 ARFLAGS      = r

@@ -25,9 +25,11 @@
 #include <mpi.h>
 #endif
 
+#include <time.h>
 #include <fstream>
 #include <iostream>
 #include <cstdlib>
+#include <cassert>
 #ifdef HPCG_DETAILED_DEBUG
 using std::cin;
 #endif
@@ -60,6 +62,11 @@ using std::endl;
 #include "TestCG.hpp"
 #include "TestSymmetry.hpp"
 #include "TestNorms.hpp"
+#include <hcsparse.h>
+
+extern double spmv_time;
+extern double* host_alpha;
+extern double* host_beta;
 
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
@@ -71,6 +78,9 @@ using std::endl;
 
 */
 int main(int argc, char * argv[]) {
+
+clock_t begin, end;
+begin = clock();
 
 #ifndef HPCG_NO_MPI
   MPI_Init(&argc, &argv);
@@ -368,7 +378,9 @@ int main(int argc, char * argv[]) {
   DeleteVector(b_computed);
   delete [] testnorms_data.values;
 
-
+  delete [] host_alpha;
+  delete [] host_beta;
+  hcsparseTeardown();
 
   HPCG_Finalize();
 
@@ -376,5 +388,8 @@ int main(int argc, char * argv[]) {
 #ifndef HPCG_NO_MPI
   MPI_Finalize();
 #endif
+  end = clock();
+  std::cerr << "\n SPMV time:" << spmv_time;
+  std::cerr << "\n Total time:" << (double)(end - begin) / CLOCKS_PER_SEC ;
   return 0;
 }
