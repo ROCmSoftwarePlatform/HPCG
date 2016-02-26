@@ -25,9 +25,11 @@
 #include <mpi.h>
 #endif
 
+#include <sys/time.h>
 #include <fstream>
 #include <iostream>
 #include <cstdlib>
+#include <cassert>
 #ifdef HPCG_DETAILED_DEBUG
 using std::cin;
 #endif
@@ -60,6 +62,17 @@ using std::endl;
 #include "TestCG.hpp"
 #include "TestSymmetry.hpp"
 #include "TestNorms.hpp"
+#include <CL/cl.hpp>
+#include "clSPARSE.h"
+
+extern cl_context context;
+extern cl_command_queue command_queue;
+extern cl_int cl_status;
+extern clsparseControl control;
+extern clsparseStatus status;
+extern clsparseScalar alpha;
+extern clsparseScalar beta;
+extern double spmv_time;
 
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
@@ -71,6 +84,9 @@ using std::endl;
 
 */
 int main(int argc, char * argv[]) {
+
+  struct timeval start, stop;
+  gettimeofday(&start, NULL);
 
 #ifndef HPCG_NO_MPI
   MPI_Init(&argc, &argv);
@@ -368,7 +384,30 @@ int main(int argc, char * argv[]) {
   DeleteVector(b_computed);
   delete [] testnorms_data.values;
 
+  /** Close & release resources */
+  status = clsparseReleaseControl(control);
+  if (status != clsparseSuccess)
+  {
+      std::cout << "Problem with releasing control object."
+                << " Error: " << status << std::endl;
+  }
 
+  status = clsparseTeardown();
+
+  if (status != clsparseSuccess)
+  {
+      std::cout << "Problem with closing clSPARSE library."
+                << " Error: " << status << std::endl;
+  }
+
+
+  clReleaseMemObject ( alpha.value );
+  clReleaseMemObject ( beta.value );
+  cl_status = clReleaseCommandQueue(command_queue);
+  assert(cl_status == CL_SUCCESS && "release commandqueue failed\n");
+
+  cl_status = clReleaseContext(context);
+  assert(cl_status == CL_SUCCESS && "Release context failed\n");
 
   HPCG_Finalize();
 
@@ -376,5 +415,8 @@ int main(int argc, char * argv[]) {
 #ifndef HPCG_NO_MPI
   MPI_Finalize();
 #endif
+  gettimeofday(&stop, NULL);
+  std::cout << "\n SPMV time:" << spmv_time;
+  std::cout << "\n Total time:" << (((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0;
   return 0;
 }
