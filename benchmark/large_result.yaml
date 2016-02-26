@@ -1,0 +1,122 @@
+HPCG-Benchmark version: 3.0
+Release date: October 1, 2015
+Machine Summary: 
+  Distributed Processes: 12288
+  Threads per processes: 4
+Global Problem Dimensions: 
+  Global nx: 4352
+  Global ny: 8704
+  Global nz: 3264
+Processor Dimensions: 
+  npx: 16
+  npy: 32
+  npz: 24
+Local Domain Dimensions: 
+  nx: 272
+  ny: 272
+  nz: 136
+########## Problem Summary  ##########: 
+Setup Information: 
+  Setup Time: 199.896
+Linear System Information: 
+  Number of Equations: 123639693312
+  Number of Nonzero Terms: 3336823012600
+Multigrid Information: 
+  Number of coarse grid levels: 3
+  Coarse Grids: 
+    Grid Level: 1
+    Number of Equations: 15454961664
+    Number of Nonzero Terms: 416921837176
+    Number of Presmoother Steps: 1
+    Number of Postsmoother Steps: 1
+    Grid Level: 2
+    Number of Equations: 1931870208
+    Number of Nonzero Terms: 52069988152
+    Number of Presmoother Steps: 1
+    Number of Postsmoother Steps: 1
+    Grid Level: 3
+    Number of Equations: 241483776
+    Number of Nonzero Terms: 6497447320
+    Number of Presmoother Steps: 1
+    Number of Postsmoother Steps: 1
+########## Memory Use Summary  ##########: 
+Memory Use Information: 
+  Total memory used for data (Gbytes): 88402.9
+  Memory used for OptimizeProblem data (Gbytes): 0
+  Bytes per equation (Total memory / Number of Equations): 715.004
+  Memory used for linear system and CG (Gbytes): 77798.6
+  Coarse Grids: 
+    Grid Level: 1
+    Memory used: 9295.77
+    Grid Level: 2
+    Memory used: 1162.91
+    Grid Level: 3
+    Memory used: 145.603
+########## Validation Testing Summary  ##########: 
+Spectral Convergence Tests: 
+  Result: PASSED
+  Unpreconditioned: 
+    Maximum iteration count: 11
+    Expected iteration count: 12
+  Preconditioned: 
+    Maximum iteration count: 2
+    Expected iteration count: 2
+Departure from Symmetry |x'Ay-y'Ax|/(2*||x||*||A||*||y||)/epsilon: 
+  Result: PASSED
+  Departure for SpMV: 1.98507e-15
+  Departure for MG: 1.11164e-13
+########## Iterations Summary  ##########: 
+Iteration Count Information: 
+  Result: PASSED
+  Reference CG iterations per set: 50
+  Optimized CG iterations per set: 50
+  Total number of reference iterations: 100
+  Total number of optimized iterations: 100
+########## Reproducibility Summary  ##########: 
+Reproducibility Information: 
+  Result: PASSED
+  Scaled residual mean: 0.00504586
+  Scaled residual variance: 1.20371e-35
+########## Performance Summary (times in sec) ##########: 
+Benchmark Time Summary: 
+  Optimization phase: 0
+  DDOT: 19.0224
+  WAXPBY: 5.32535
+  SpMV: 57.6812
+  MG: 381.274
+  Total: 463.351
+Floating Point Operations Summary: 
+  Raw DDOT: 7.46784e+13
+  Raw WAXPBY: 7.46784e+13
+  Raw SpMV: 6.80712e+14
+  Raw MG: 3.80841e+15
+  Total: 4.63848e+15
+  Total with convergence overhead: 4.63848e+15
+GB/s Summary: 
+  Raw Read B/W: 61657.7
+  Raw Write B/W: 14248.2
+  Raw Total B/W: 75906
+  Total with convergence and optimization phase overhead: 75906
+GFLOP/s Summary: 
+  Raw DDOT: 3925.82
+  Raw WAXPBY: 14023.2
+  Raw SpMV: 11801.3
+  Raw MG: 9988.66
+  Raw Total: 10010.7
+  Total with convergence overhead: 10010.7
+  Total with convergence and optimization phase overhead: 5373.95
+User Optimization Overheads: 
+  Optimization phase time (sec): 0
+  Optimization phase time vs reference SpMV+MG time: 0
+DDOT Timing Variations: 
+  Min DDOT MPI_Allreduce time: 2.68329
+  Max DDOT MPI_Allreduce time: 20.9088
+  Avg DDOT MPI_Allreduce time: 12.2239
+__________ Final Summary __________: 
+  HPCG result is VALID with a GFLOP/s rating of: 5373.95
+  Reference version of ComputeDotProduct used: Performance results are most likely suboptimal
+  Reference version of ComputeSPMV used: Performance results are most likely suboptimal
+  Reference version of ComputeMG used and number of threads greater than 1: Performance results are severely suboptimal
+  Reference version of ComputeWAXPBY used: Performance results are most likely suboptimal
+  Results are valid but execution time (sec) is: 463.351
+  Official results execution time (sec) must be at least: 1800

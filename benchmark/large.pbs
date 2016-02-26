@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l walltime=01:00:00
+#PBS -N HPCG-TEST
+#PBS -l mppwidth=49152
+#PBS -j oe
+#PBS -q regular
+
+cd $PBS_O_WORKDIR
+
+export OMP_NUM_THREADS=4
+aprun -n 12288 -N 6 -S 3 -d $OMP_NUM_THREADS -cc depth ./xhpcg
+
