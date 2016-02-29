@@ -31,9 +31,9 @@
 #endif
 #include <vector>
 #include <cassert>
-#include <time.h>
+#include <sys/time.h>
 #include <hcsparse.h>
-#inckude <sys/time.h>
+
   
 hcsparseCsrMatrix gCsrMat;
 hcdenseVector gX;
@@ -154,11 +154,6 @@ int hcsparse_csrmv_adaptive(const SparseMatrix & h_A, Vector & h_x, Vector & h_y
   dev_Y.synchronize();
   dev_alpha.synchronize();
   dev_beta.synchronize();
-
-  delete [] val;
-  delete [] col;
-  delete [] rowoff;
-  delete [] rowBlocks;
   
   return 0;
 }
