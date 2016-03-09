@@ -72,6 +72,13 @@ extern clsparseControl control;
 extern clsparseStatus status;
 extern clsparseScalar alpha;
 extern clsparseScalar beta;
+extern clsparseCsrMatrix A;
+extern cldenseVector x;
+extern cldenseVector y;
+
+extern double *val;
+extern int *col, *rowoff;
+
 extern double spmv_time;
 
 /*!
@@ -403,11 +410,21 @@ int main(int argc, char * argv[]) {
 
   clReleaseMemObject ( alpha.value );
   clReleaseMemObject ( beta.value );
+  clReleaseMemObject ( ::A.rowBlocks );
+  clReleaseMemObject ( ::A.colIndices );
+  clReleaseMemObject ( ::A.rowOffsets );
+  clReleaseMemObject ( ::A.values );
+  clReleaseMemObject ( ::x.values );
+  clReleaseMemObject ( ::y.values );
   cl_status = clReleaseCommandQueue(command_queue);
   assert(cl_status == CL_SUCCESS && "release commandqueue failed\n");
 
   cl_status = clReleaseContext(context);
   assert(cl_status == CL_SUCCESS && "Release context failed\n");
+  
+  delete [] val;
+  delete [] col;    
+  delete [] rowoff; 
 
   HPCG_Finalize();
 
