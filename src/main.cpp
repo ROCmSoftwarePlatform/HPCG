@@ -227,7 +227,7 @@ int main(int argc, char * argv[]) {
 
   // Call user-tunable set up function.
   double t7 = mytimer();
-  OptimizeProblem(A, data, b, x, xexact);
+ // OptimizeProblem(A, data, b, x, xexact);
   t7 = mytimer() - t7;
   times[7] = t7;
 #ifdef HPCG_DEBUG

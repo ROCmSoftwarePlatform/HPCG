@@ -23,6 +23,7 @@
 #endif
 #include "ComputeSYMGS_ref.hpp"
 #include <cassert>
+ #include <iostream>
 
 /*!
   Computes one step of symmetric Gauss-Seidel:
@@ -75,6 +76,7 @@ int ComputeSYMGS_ref( const SparseMatrix & A, const Vector & r, Vector & x) {
       local_int_t curCol = currentColIndices[j];
       sum -= currentValues[j] * xv[curCol];
     }
+    
     sum += xv[i]*currentDiagonal; // Remove diagonal contribution from previous loop
 
     xv[i] = sum/currentDiagonal;

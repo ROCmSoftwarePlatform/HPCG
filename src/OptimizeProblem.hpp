@@ -18,8 +18,15 @@
 #include "SparseMatrix.hpp"
 #include "Vector.hpp"
 #include "CGData.hpp"
+#include <vector>
+#include <algorithm>
+#include <cstdlib>
+#include <iostream>
 
-int OptimizeProblem(SparseMatrix & A, CGData & data,  Vector & b, Vector & x, Vector & xexact);
+int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref, std::vector<local_int_t> &colors);
+void lubys_graph_coloring (int c,int *row_offset,int *col_index,int *Colors,int *random,int *temp);
+void copy_value(int * dest, int *source);
+int hash_function(int index , int nnz);
 
 // This helper function should be implemented in a non-trivial way if OptimizeProblem is non-trivial
 // It should return as type double, the total number of bytes allocated and retained after calling OptimizeProblem.

@@ -17,6 +17,7 @@
 #include "SparseMatrix.hpp"
 #include "Vector.hpp"
 
-int ComputeSYMGS( const SparseMatrix  & A, const Vector & r, Vector & x);
+ int ComputeSYMGS_check( const SparseMatrix & A, const Vector & r_copy, Vector & x_copy);
+int ComputeSYMGS( const SparseMatrix & A, const Vector & r, Vector & x);
 
 #endif // COMPUTESYMGS_HPP
