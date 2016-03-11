@@ -146,7 +146,7 @@ int clsparse_setup(const SparseMatrix hA, Vector hx, Vector hy)
   x.num_values = hx.localLength;
   y.num_values = hy.localLength;                   
                
-  A.values = ::clCreateBuffer( context, CL_MEM_READ_ONLY | CL_MEM_ALLOC_HOST_PTR,
+  A.values = ::clCreateBuffer( context, CL_MEM_READ_ONLY,
                                A.num_nonzeros * sizeof( double ), NULL, &cl_status );
   
   A.colIndices = ::clCreateBuffer( context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
