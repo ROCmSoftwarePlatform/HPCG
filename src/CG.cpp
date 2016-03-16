@@ -21,6 +21,7 @@
 #include <fstream>
 
 #include <cmath>
+ #include <iostream>
 
 #include "hpcg.hpp"
 
@@ -28,8 +29,10 @@
 #include "mytimer.hpp"
 #include "ComputeSPMV.hpp"
 #include "ComputeMG.hpp"
+ #include "ComputeMG_ref.hpp"
 #include "ComputeDotProduct.hpp"
 #include "ComputeWAXPBY.hpp"
+#include "OptimizeProblem.hpp"
 
 
 // Use TICK and TOCK to time a code section in MATLAB-like fashion
@@ -56,7 +59,7 @@
 
   @see CG_ref()
 */
-int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
+int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector & b, Vector & x,
     const int max_iter, const double tolerance, int & niters, double & normr, double & normr0,
     double * times, bool doPreconditioning) {
 
@@ -100,7 +103,7 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
   for (int k=1; k<=max_iter && normr/normr0 > tolerance; k++ ) {
     TICK();
     if (doPreconditioning)
-      ComputeMG(A, r, z); // Apply preconditioner
+      ComputeMG(A, A_ref, r, z); // Apply preconditioner
     else
       CopyVector (r, z); // copy r to z (no preconditioning)
     TOCK(t5); // Preconditioner apply time

@@ -38,7 +38,7 @@ struct TestCGData_STRUCT {
 };
 typedef struct TestCGData_STRUCT TestCGData;
 
-extern int TestCG(SparseMatrix & A, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data);
+extern int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data);
 
 #endif  // TESTCG_HPP
 

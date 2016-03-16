@@ -28,6 +28,9 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index,int *Colors,int 
 void copy_value(int * dest, int *source);
 int hash_function(int index , int nnz);
 
+void free_refmatrix_m(SparseMatrix &A);
+void copy_sparse_matrix_m(const SparseMatrix &A, SparseMatrix &A_ref);
+
 // This helper function should be implemented in a non-trivial way if OptimizeProblem is non-trivial
 // It should return as type double, the total number of bytes allocated and retained after calling OptimizeProblem.
 // This value will be used to report Gbytes used in ReportResults (the value returned will be divided by 1000000000.0).

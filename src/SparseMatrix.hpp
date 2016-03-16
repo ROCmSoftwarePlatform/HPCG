@@ -47,6 +47,7 @@ struct SparseMatrix_STRUCT {
   mutable bool isSpmvOptimized;
   mutable bool isMgOptimized;
   mutable bool isWaxpbyOptimized;
+  std::vector<local_int_t> colors;
   /*!
    This is for storing optimized data structres created in OptimizeProblem and
    used inside optimized ComputeSPMV().
@@ -64,6 +65,7 @@ struct SparseMatrix_STRUCT {
   local_int_t * receiveLength; //!< lenghts of messages received from neighboring processes
   local_int_t * sendLength; //!< lenghts of messages sent to neighboring processes
   double * sendBuffer; //!< send buffer for non-blocking sends
+
 #endif
 };
 typedef struct SparseMatrix_STRUCT SparseMatrix;
