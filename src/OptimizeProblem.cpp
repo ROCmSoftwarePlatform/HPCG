@@ -175,8 +175,6 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
     A_ref.counters[i] = counters[i];
   }
 
-for(int i = 0; i <= c; i++)
-  std::cerr<<"counters[i]"<<A_ref.counters[i]<<" ::"<<i<<std::endl;
   // translate `colors' into a permutation.
   for (local_int_t i=0; i<nrow; ++i) // for each color `c'
   {
