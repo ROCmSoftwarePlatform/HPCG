@@ -24,6 +24,7 @@
 #include <sys/time.h>
 #include <CL/cl.hpp>
 #include "clSPARSE.h"
+#include "clSPARSE-error.h"
 
 cl_platform_id *platform;
 cl_context context;
@@ -32,7 +33,7 @@ cl_command_queue command_queue;
 cl_int err;
 cl_int cl_status;
 
-clsparseControl control;
+clsparseCreateResult createResult;
 clsparseStatus status;
 clsparseScalar alpha;
 clsparseScalar beta;
@@ -42,7 +43,7 @@ clsparseCsrMatrix A;
   
 double *val;
 int *col, *rowoff;
-double spmv_time;
+//double spmv_time;
 
 int clsparse_setup(const SparseMatrix hA, Vector hx, Vector hy)
 {
@@ -95,13 +96,8 @@ int clsparse_setup(const SparseMatrix hA, Vector hx, Vector hy)
 
 
   // Create clsparseControl object
-  control = clsparseCreateControl(command_queue, &status);
-  if (status != CL_SUCCESS)
-  {
-      std::cout << "Problem with creating clSPARSE control object"
-                <<" error [" << status << "]" << std::endl;
-      return -4;
-  }
+  createResult = clsparseCreateControl(command_queue);
+  CLSPARSE_V( createResult.status, "Failed to create clsparse control" );
    
   double one = 1.0;
   double zero = 0.0;
@@ -149,19 +145,16 @@ int clsparse_setup(const SparseMatrix hA, Vector hx, Vector hy)
   A.values = ::clCreateBuffer( context, CL_MEM_READ_ONLY,
                                A.num_nonzeros * sizeof( double ), NULL, &cl_status );
   
-  A.colIndices = ::clCreateBuffer( context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   A.num_nonzeros * sizeof( cl_int ), col, &cl_status );
+  A.col_indices = ::clCreateBuffer( context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+                                   A.num_nonzeros * sizeof( clsparseIdx_t ), col, &cl_status );
 
-  A.rowOffsets = ::clCreateBuffer( context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   ( A.num_rows + 1 ) * sizeof( cl_int ), rowoff, &cl_status );               
+  A.row_pointer = ::clCreateBuffer( context, CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+                                   ( A.num_rows + 1 ) * sizeof( clsparseIdx_t ), rowoff, &cl_status );               
                                       
   // This function allocates memory for rowBlocks structure. If not called
   // the structure will not be calculated and clSPARSE will run the vectorized
   // version of SpMV instead of adaptive;
-  clsparseCsrMetaSize( &A, control );
-  A.rowBlocks = ::clCreateBuffer( context, CL_MEM_READ_WRITE,
-          A.rowBlockSize * sizeof( cl_ulong ), NULL, &cl_status );
-  clsparseCsrMetaCompute( &A, control );                                        
+  clsparseCsrMetaCreate( &A, createResult.control );                                      
                                      
   x.values = clCreateBuffer(context, CL_MEM_READ_ONLY, x.num_values * sizeof(double),
                             NULL, &cl_status);  
@@ -175,8 +168,11 @@ int hpcg2clsparse(const SparseMatrix & hA, Vector & hx, Vector & hy)
 {         
   static int call_count;
   
-  if (!call_count)   
-    clsparse_setup(hA, hx, hy);  
+  if (!call_count) 
+  {  
+    clsparse_setup(hA, hx, hy); 
+    ++call_count; 
+  } 
     
   int k = 0;
   for(int i = 0; i < hA.totalNumberOfRows; i++) 
@@ -194,7 +190,7 @@ int hpcg2clsparse(const SparseMatrix & hA, Vector & hx, Vector & hy)
                               x.num_values * sizeof( double ), hx.values, 0, NULL, NULL );                                
 
  /* Call the spmv algorithm */
-  status = clsparseDcsrmv(&alpha, &A, &x, &beta, &y, control);
+  status = clsparseDcsrmv(&alpha, &A, &x, &beta, &y, createResult.control);
 
   if (status != clsparseSuccess)
   {
@@ -204,8 +200,6 @@ int hpcg2clsparse(const SparseMatrix & hA, Vector & hx, Vector & hy)
 
   clEnqueueReadBuffer(command_queue, y.values, CL_TRUE, 0,
                               y.num_values * sizeof(double), hy.values, 0, NULL, NULL );  
-  
-  ++call_count; 
   
   return 0;
 }
@@ -227,16 +221,17 @@ int hpcg2clsparse(const SparseMatrix & hA, Vector & hx, Vector & hy)
   @see ComputeSPMV_ref
 */
 int ComputeSPMV( const SparseMatrix & A, Vector & x, Vector & y) {
-  struct timeval start, stop;
-  gettimeofday(&start, NULL);
+  /*struct timeval start, stop;
+  gettimeofday(&start, NULL);*/
+  //std::cerr << "SPMV" << '\n';
   // This line and the next two lines should be removed and your version of ComputeSPMV should be used.
   //A.isSpmvOptimized = false;
   //return ComputeSPMV_ref(A, x, y);
   
   hpcg2clsparse(A, x, y);
   
-  gettimeofday(&stop, NULL);
-  spmv_time += ((((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0);
+  /*gettimeofday(&stop, NULL);
+  spmv_time += ((((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0);*/
   
   return 0;
   

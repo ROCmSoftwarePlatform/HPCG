@@ -68,18 +68,19 @@ using std::endl;
 extern cl_context context;
 extern cl_command_queue command_queue;
 extern cl_int cl_status;
-extern clsparseControl control;
+extern clsparseCreateResult createResult;
 extern clsparseStatus status;
 extern clsparseScalar alpha;
 extern clsparseScalar beta;
 extern clsparseCsrMatrix A;
 extern cldenseVector x;
 extern cldenseVector y;
+extern clsparseScalar d_beta;
 
 extern double *val;
 extern int *col, *rowoff;
 
-extern double spmv_time;
+//extern double spmv_time;
 
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
@@ -92,8 +93,8 @@ extern double spmv_time;
 */
 int main(int argc, char * argv[]) {
 
-  struct timeval start, stop;
-  gettimeofday(&start, NULL);
+  /*struct timeval start, stop;
+  gettimeofday(&start, NULL);*/
 
 #ifndef HPCG_NO_MPI
   MPI_Init(&argc, &argv);
@@ -392,7 +393,7 @@ int main(int argc, char * argv[]) {
   delete [] testnorms_data.values;
 
   /** Close & release resources */
-  status = clsparseReleaseControl(control);
+  status = clsparseReleaseControl(createResult.control);
   if (status != clsparseSuccess)
   {
       std::cout << "Problem with releasing control object."
@@ -407,12 +408,12 @@ int main(int argc, char * argv[]) {
                 << " Error: " << status << std::endl;
   }
 
-
+  clsparseCsrMetaDelete( &::A );
   clReleaseMemObject ( alpha.value );
   clReleaseMemObject ( beta.value );
-  clReleaseMemObject ( ::A.rowBlocks );
-  clReleaseMemObject ( ::A.colIndices );
-  clReleaseMemObject ( ::A.rowOffsets );
+  clReleaseMemObject ( d_beta.value );
+  clReleaseMemObject ( ::A.col_indices );
+  clReleaseMemObject ( ::A.row_pointer );
   clReleaseMemObject ( ::A.values );
   clReleaseMemObject ( ::x.values );
   clReleaseMemObject ( ::y.values );
@@ -432,8 +433,8 @@ int main(int argc, char * argv[]) {
 #ifndef HPCG_NO_MPI
   MPI_Finalize();
 #endif
-  gettimeofday(&stop, NULL);
+  /*gettimeofday(&stop, NULL);
   std::cout << "\n SPMV time:" << spmv_time;
-  std::cout << "\n Total time:" << (((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0;
+  std::cout << "\n Total time:" << (((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0;*/
   return 0;
 }

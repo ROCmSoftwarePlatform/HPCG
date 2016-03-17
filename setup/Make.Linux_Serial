@@ -117,9 +117,9 @@ HPCG_DEFS     = $(HPCG_OPTS) $(HPCG_INCLUDES)
 # ----------------------------------------------------------------------
 #
 CXX          = /usr/bin/g++
-CXXFLAGS     =  $(HPCG_DEFS)  -std=c++11 -O3 -funroll-loops -W -Wall -pedantic -fomit-frame-pointer -I /opt/AMDAPPSDK-3.0/include/ -I /home/arun-ubuntu/Downloads/clSPARSE-0.8.1.0-Linux-x64/include
+CXXFLAGS     =  $(HPCG_DEFS)  -std=c++11 -O3 -funroll-loops -W -Wall -pedantic -fomit-frame-pointer -I /opt/AMDAPPSDK-3.0/include/ -I /home/arun-ubuntu/Downloads/clSPARSE-0.10.0.0-Linux-x64/include
 LINKER       = $(CXX)
-LINKFLAGS    = $(CXXFLAGS) -L /home/arun-ubuntu/Downloads/clSPARSE-0.8.1.0-Linux-x64/lib64 -L  /opt/AMDAPPSDK-3.0/lib/x86_64/ -lclSPARSE -lOpenCL
+LINKFLAGS    = $(CXXFLAGS) -L /home/arun-ubuntu/Downloads/clSPARSE-0.10.0.0-Linux-x64/lib64 -L  /opt/AMDAPPSDK-3.0/lib/x86_64/ -lclSPARSE -lOpenCL
 #
 #
 ARCHIVER     = ar
