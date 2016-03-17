@@ -59,7 +59,7 @@ int hash_function(int index , int nnz)
 
 // Copy source to destination
 
-void copy_value(int * dest, int *source)
+void copy_value( std::vector<local_int_t> &dest,  std::vector<local_int_t> &source)
 {
     for (int i = 0; i <row; ++i)
     {
@@ -69,10 +69,10 @@ void copy_value(int * dest, int *source)
 
 // luby's graph coloring algorthim - nvidia's approach
 
-void lubys_graph_coloring (int c,int *row_offset,int *col_index,int *Colors,int *random,int *temp)
+void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<local_int_t> &colors,int *random,std::vector<local_int_t> &temp)
 {
 
-    copy_value(temp,Colors);
+    copy_value(temp,colors);
     for(int i=0;i<row;i++)
     {
        int flag = 1;
@@ -82,7 +82,7 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index,int *Colors,int 
        for(int k=row_offset[i];k<row_offset[i+1];k++)
        {
           int j = col_index[k];
-          int jc = Colors[j];
+          int jc = colors[j];
           if (((jc != -1) && (jc != c)) || (i == j)) 
             continue;
           int jr = random[j];
@@ -95,17 +95,16 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index,int *Colors,int 
        }
         
     }
-    copy_value(Colors,temp);
+    copy_value(colors,temp);
 }
 
 
-int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref, std::vector<local_int_t> &colors) {
+int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
 
   const local_int_t nrow = A.localNumberOfRows;
   row = nrow;
   int *random = new int [nrow];
-  int *Colors = new int[nrow];
-  int *temp = new int [nrow];
+  std::vector<local_int_t> temp(nrow, -1);
   int *row_offset,*col_index;
   col_index = new int [nrow * 27];
   row_offset = new int [(nrow + 1)];
@@ -113,7 +112,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref, std::vector<loc
  // Initialize local Color array and random array using hash functions.
   for (int i = 0; i < nrow; i++)
   {
-      Colors[i] = -1;
+      //Colors[i] = -1;
       random[i] = hash_function(i,A.nonzerosInRow[i]);
   }
   row_offset[0] = 0;
@@ -132,7 +131,6 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref, std::vector<loc
   
  
   k = 0;
-  //std::cerr<<"row offset assigning"<<std::endl;
   // Calculate the row offset.
   int ridx = 1;
   int sum = 0;
@@ -148,25 +146,19 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref, std::vector<loc
   for( c = 0; c < nrow; c++)
   {
 
-      lubys_graph_coloring(c,row_offset,col_index,Colors,random,temp);
-      std::vector<int> v(Colors,Colors+nrow);
-      int left = std::count(v.begin(), v.end(), -1);
+      lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
+      int left = std::count(A_ref.colors.begin(), A_ref.colors.end(), -1);
         if(left == 0)
           break;
   }
   
- 
-  // Copy the local Colors array to the color vector. 
-  for(int i = 0; i < nrow; i++)
-  {
-    colors[i] = Colors[i];
-  }
-  
-  // Calculate number of rows with the same color and save it in counter vector. 
-  std::vector<local_int_t> counters((c+1));
+  // Calculate number of rows with the same color and save it in counter vector.
+  std::vector<local_int_t> counters(c+1);
+  A_ref.counters.resize(c+5);
+  std::fill(counters.begin(), counters.end(), 0);
   for (local_int_t i = 0; i < nrow; ++i)
   {
-    counters[colors[i]]++;
+    counters[A_ref.colors[i]]++;
   }
  
   // Calculate color offset using counter vector. 
@@ -178,23 +170,29 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref, std::vector<loc
   }
   counters[0] = 0;
 
+
+  for (int i = 0; i <= c; ++i) {
+    A_ref.counters[i] = counters[i];
+  }
+
+for(int i = 0; i <= c; i++)
+  std::cerr<<"counters[i]"<<A_ref.counters[i]<<" ::"<<i<<std::endl;
   // translate `colors' into a permutation.
   for (local_int_t i=0; i<nrow; ++i) // for each color `c'
   {
-    colors[i] = counters[colors[i]]++;
+    A_ref.colors[i] = counters[A_ref.colors[i]]++;
   }
-
 
   // Rearranges the reference matrix according to the coloring index.
   for(int i = 0; i < nrow; i++)
   {
    
-	   const int currentNumberOfNonzeros = A.nonzerosInRow[colors[i]];
-     A_ref.nonzerosInRow[i] = A.nonzerosInRow[colors[i]];
-	   const double * const currentValues = A.matrixValues[colors[i]];
-	   const local_int_t * const currentColIndices = A.mtxIndL[colors[i]];
+	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
+     A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
+	   const double * const currentValues = A.matrixValues[A_ref.colors[i]];
+	   const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
 
-	   double * diagonalValue = A.matrixDiagonal[colors[i]];
+	   double * diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
 	   A_ref.matrixDiagonal[i] = diagonalValue;
   
 		//rearrange the elements in the row
@@ -203,7 +201,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref, std::vector<loc
      {
 	      for(int j = 0; j < currentNumberOfNonzeros; j++)
 	      {		
-		       if(colors[k] == currentColIndices[j])
+		       if(A_ref.colors[k] == currentColIndices[j])
 		       {
 			        A_ref.matrixValues[i][col_indx] = currentValues[j];
 			        A_ref.mtxIndL[i][col_indx++] = k;
@@ -213,12 +211,9 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref, std::vector<loc
      }
   }
 
-
-  delete [] Colors;
   delete [] row_offset;
   delete [] col_index;
   delete [] random;
-  delete [] temp;
 
   return 0;
 }

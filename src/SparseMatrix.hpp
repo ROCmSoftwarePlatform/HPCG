@@ -47,7 +47,8 @@ struct SparseMatrix_STRUCT {
   mutable bool isSpmvOptimized;
   mutable bool isMgOptimized;
   mutable bool isWaxpbyOptimized;
-  std::vector<local_int_t> colors;
+  std::vector<local_int_t> colors; //  save the reordered row index.
+  std::vector<local_int_t> counters; // save the color offset.
   /*!
    This is for storing optimized data structres created in OptimizeProblem and
    used inside optimized ComputeSPMV().

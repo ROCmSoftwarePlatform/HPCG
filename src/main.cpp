@@ -243,10 +243,10 @@ int main(int argc, char * argv[]) {
 
   /* call OptimizeProblem to all grid levels so the reference matrix is reordered 
   based on Luby's color reordering algorithm*/
-  OptimizeProblem(A, A_ref, A_ref.colors);
-  OptimizeProblem(*A.Ac, *A_ref.Ac, A_ref.Ac->colors);
-  OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac, A_ref.Ac->Ac->colors);
-  OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac, A_ref.Ac->Ac->Ac->colors);
+  OptimizeProblem(A, A_ref);
+  OptimizeProblem(*A.Ac, *A_ref.Ac);
+  OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
+  OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
 
   t7 = mytimer() - t7;
   times[7] = t7;

@@ -110,10 +110,10 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
 
   /* call OptimizeProblem to all grid levels so the reference matrix is reordered 
   based on Luby's color reordering algorithm*/
-  OptimizeProblem(A, A_ref, A_ref.colors);
-  OptimizeProblem(*A.Ac, *A_ref.Ac, A_ref.Ac->colors);
-  OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac, A_ref.Ac->Ac->colors);
-  OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac, A_ref.Ac->Ac->Ac->colors);
+  OptimizeProblem(A, A_ref);
+  OptimizeProblem(*A.Ac, *A_ref.Ac);
+  OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
+  OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
 
   for (int k=0; k<2; ++k) { // This loop tests both unpreconditioned and preconditioned runs
     int expected_niters = testcg_data.expected_niters_no_prec;

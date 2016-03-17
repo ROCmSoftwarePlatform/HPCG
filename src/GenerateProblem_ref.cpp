@@ -66,8 +66,6 @@ void GenerateProblem_ref(SparseMatrix & A, Vector * b, Vector * x, Vector * xexa
 
   local_int_t localNumberOfRows = nx*ny*nz; // This is the size of our subblock
 
-  std::vector<local_int_t> colors(A.localNumberOfRows, -1);
-
   // If this assert fails, it most likely means that the local_int_t is set to int and should be set to long long
   assert(localNumberOfRows>0); // Throw an exception of the number of rows is less than zero (can happen if int overflow)
   local_int_t numberOfNonzerosPerRow = 27; // We are approximating a 27-point finite element/volume/difference 3D stencil
