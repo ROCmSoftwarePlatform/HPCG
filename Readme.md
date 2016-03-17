@@ -30,8 +30,7 @@ export CLAMP_NOTILECHECK=ON
 
 ### clSPARSE ###
 ### Pre-requisites ###
-* Download [clSPARSE](https://github.com/clMathLibraries/clSPARSE/releases/download/0.8.1.0/clSPARSE­0.8.
-1.0­Linux­x64.tar.gz) for linux. 
+* Download [clSPARSE](https://github.com/clMathLibraries/clSPARSE/releases/download/v0.10.0.0/clSPARSE-0.10.0.0-Linux-x64.tar.gz) for linux. 
 * Update the clSPARSE include and library path in Makefile.Linux_Serial in the setup directory. (for ex. -­I /path/to/clsparse/include -L /path/to/clsparse/lib64) 
 * Add path to clSPARSE library to LD_LIBRARY_PATH in the terminal. 
 (example)
