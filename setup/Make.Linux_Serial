@@ -117,10 +117,10 @@ HPCG_DEFS     = $(HPCG_OPTS) $(HPCG_INCLUDES)
 # ----------------------------------------------------------------------
 #
 CXX          = /usr/bin/g++
-CXXFLAGS     = $(HPCG_DEFS) -fomit-frame-pointer -O3 -funroll-loops -W -Wall -pedantic
+CXXFLAGS     = $(HPCG_DEFS) -fomit-frame-pointer -O3 -funroll-loops -W -Wall -pedantic -I${AMDAPPSDKROOT}/include
 #
 LINKER       = $(CXX)
-LINKFLAGS    = $(CXXFLAGS)
+LINKFLAGS    = $(CXXFLAGS) -L$(AMDAPPSDKROOT)/lib/x86_64 -lOpenCL
 #
 ARCHIVER     = ar
 ARFLAGS      = r

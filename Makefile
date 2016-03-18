@@ -1,7 +1,7 @@
 # -*- Makefile -*-
 
 # by default, "arch" is unknown, should be specified in the command line
-arch = UNKNOWN
+arch = Linux_Serial
 
 setup_file = setup/Make.$(arch)
 include $(setup_file)
@@ -18,7 +18,7 @@ HPCG_DEPS = src/CG.o src/CG_ref.o src/TestCG.o src/ComputeResidual.o \
 	 src/ComputeOptimalShapeXYZ.o src/MixedBaseCounter.o src/CheckAspectRatio.o
 
 bin/xhpcg: src/main.o $(HPCG_DEPS)
-	$(LINKER) $(LINKFLAGS) src/main.o $(HPCG_DEPS) -o bin/xhpcg $(HPCG_LIBS)
+	$(LINKER) src/main.o $(HPCG_DEPS) -o bin/xhpcg $(HPCG_LIBS) $(LINKFLAGS)
 
 clean:
 	rm -f $(HPCG_DEPS) bin/xhpcg src/main.o

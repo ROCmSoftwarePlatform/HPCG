@@ -27,6 +27,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref);
 void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<local_int_t> &colors,int *random, std::vector<local_int_t> &temp);
 void copy_value( std::vector<local_int_t> &dest,  std::vector<local_int_t> &source);
 int hash_function(int index , int nnz);
+void InitOpenCL(void);
 
 void free_refmatrix_m(SparseMatrix &A);
 void copy_sparse_matrix_m(const SparseMatrix &A, SparseMatrix &A_ref);

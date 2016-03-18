@@ -20,8 +20,93 @@
 
 #include "OptimizeProblem.hpp"
 #include <iostream>
+#include <CL/cl.hpp>
 using namespace std;
 int row ;
+
+cl_platform_id *platform = NULL;
+cl_context context = 0;
+cl_device_id *device = NULL;
+cl_command_queue command_queue = 0;
+cl_int err = CL_SUCCESS;
+cl_int cl_status = CL_SUCCESS;
+
+
+const char *kernel_name = "lubys_graph";
+const char *Lubys_graph_kernel = "                                                    \n\
+  __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_index, \n\
+                            __global int *Colors, __global int *random,               \n\
+                            __global int *temp)                                       \n\
+  {                                                                                   \n\
+    int x = get_global_id(0);                                                         \n\
+    int flag = 1;                                                                     \n\
+    if(temp[x] == -1)                                                                 \n\
+    {                                                                                 \n\
+      int ir = random[i];                                                             \n\
+      for(int k = row_offset[x]; k < row_offset[x + 1]; k++)                          \n\
+      {                                                                               \n\
+        int j = col_index[k];                                                         \n\
+        int jc = Colors[j];                                                           \n\
+        if (((jc != -1) && (jc != c)) || (x == j))                                    \n\
+        {                                                                             \n\
+          continue;                                                                   \n\
+        }                                                                             \n\
+        int jr = random[j];                                                           \n\
+        if(ir <= jr)                                                                  \n\
+        {                                                                             \n\
+          flag = 0;                                                                   \n\
+        }                                                                             \n\
+      }                                                                               \n\
+      if(flag)                                                                        \n\
+      {                                                                               \n\
+        temp[x] = c;                                                                  \n\
+      }                                                                               \n\
+    }                                                                                 \n\
+  }                                                                                   \n\
+  ";
+
+void InitOpenCL(void)
+{
+  if (NULL != platform)
+  {
+    return;
+  }
+
+  cl_uint ret_num_of_platforms = 0;
+  cl_int err = clGetPlatformIDs(0, NULL, &ret_num_of_platforms);
+  assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
+  if (err != CL_SUCCESS || 0 == ret_num_of_platforms)
+  {
+    std::cout << "ERROR: Getting platforms!" << std::endl;
+    return;
+  }
+
+  platform = (cl_platform_id*)malloc(ret_num_of_platforms * sizeof(cl_platform_id));
+  err = clGetPlatformIDs(ret_num_of_platforms, platform, 0);
+  assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
+
+  cl_uint ret_num_of_devices = 0;
+  err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 0, NULL, &ret_num_of_devices);
+
+  assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
+
+  device = (cl_device_id*)malloc(ret_num_of_devices * sizeof(cl_device_id));
+  err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_GPU , ret_num_of_devices, device, 0);
+  assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
+
+  cl_context_properties property[] = {CL_CONTEXT_PLATFORM,
+                                      (cl_context_properties)(platform[0]),
+                                      0};
+
+  context = clCreateContext(property, ret_num_of_devices, &device[0], NULL, NULL, &err);
+  assert(err == CL_SUCCESS && "clCreateContext failed\n");
+
+  command_queue = clCreateCommandQueue(context, device[0], 0, &err);
+  assert(err == CL_SUCCESS && "clCreateCommandQueue failed \n");
+
+  return;
+}
+
 /*!
   Optimizes the data structures used for CG iteration to increase the
   performance of the benchmark version of the preconditioned CG algorithm.
@@ -141,7 +226,9 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
      ridx++;
   }
 
-  // Call luby's graph coloring algorithm. 
+  InitOpenCL();
+
+  // Call luby's graph coloring algorithm.
   int c = 0;
   for( c = 0; c < nrow; c++)
   {
