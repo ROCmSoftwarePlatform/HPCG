@@ -119,8 +119,8 @@ void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
 {
   if (NULL == clRow_offset)
   {
-    clRow_offset = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (row_size + 1),
-                                row_offset, &cl_status);
+    clRow_offset = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                  (row_size + 1) * sizeof(int), row_offset, &cl_status);
     if (CL_SUCCESS != cl_status || NULL == clRow_offset)
     {
       std::cout << "clRow_offset allocation failed. status: " << cl_status << std::endl;
@@ -130,8 +130,8 @@ void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
 
   if (NULL == clCol_index)
   {
-    clCol_index = clCreateBuffer(context, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR, row_size * 27,
-                                 col_index, &cl_status);
+    clCol_index = clCreateBuffer(context, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR,
+                                 (row_size * 27) * sizeof(int), col_index, &cl_status);
     if (CL_SUCCESS != cl_status || NULL == clCol_index)
     {
       std::cout << "clCol_index allocation failed. status: " << cl_status << std::endl;
@@ -141,8 +141,8 @@ void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
 
   if (NULL == clColors)
   {
-    clColors = clCreateBuffer(context, CL_MEM_READ_WRITE, row_size,
-                            NULL, &cl_status);
+    clColors = clCreateBuffer(context, CL_MEM_READ_WRITE, row_size * sizeof(int),
+                              NULL, &cl_status);
     if (CL_SUCCESS != cl_status || NULL == clColors)
     {
       std::cout << "clColors allocation failed. status: " << cl_status << std::endl;
@@ -152,8 +152,8 @@ void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
 
   if (NULL == clRandom)
   {
-    clRandom = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, row_size,
-                              random, &cl_status);
+    clRandom = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                              row_size * sizeof(int), random, &cl_status);
     if (CL_SUCCESS != cl_status || NULL == clRandom)
     {
       std::cout << "clRandom allocation failed. status: " << cl_status << std::endl;
@@ -163,7 +163,7 @@ void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
 
   if (NULL == clTemp)
   {
-    clTemp = clCreateBuffer(context, CL_MEM_READ_WRITE, row_size,
+    clTemp = clCreateBuffer(context, CL_MEM_READ_WRITE, row_size * sizeof(int),
                           NULL, &cl_status);
     if (CL_SUCCESS != cl_status || NULL == clTemp)
     {
@@ -236,10 +236,10 @@ void ExecuteKernel(int c, int row_size, std::vector<local_int_t> &iColors)
     colors[i] = iColors[i];
   }
 
-  cl_status = clEnqueueWriteBuffer(command_queue, clColors, CL_TRUE, 0, row_size,
+  cl_status = clEnqueueWriteBuffer(command_queue, clColors, CL_TRUE, 0, row_size * sizeof(int),
                                    colors, 0, NULL, NULL);
 
-  cl_status |= clEnqueueWriteBuffer(command_queue, clTemp, CL_TRUE, 0, row_size,
+  cl_status |= clEnqueueWriteBuffer(command_queue, clTemp, CL_TRUE, 0, row_size * sizeof(int),
                                     colors, 0, NULL, NULL);
   if (CL_SUCCESS != cl_status)
   {
@@ -298,7 +298,7 @@ void ExecuteKernel(int c, int row_size, std::vector<local_int_t> &iColors)
   clFinish(command_queue);
 
   cl_status |= clEnqueueReadBuffer(command_queue, clTemp, CL_TRUE, 0,
-                                   row_size, colors, 0, NULL, NULL);
+                                   row_size * sizeof(int), colors, 0, NULL, NULL);
 
   //std::copy(colors, colors + row_size, iColors.begin());
   for (int i = 0; i < iColors.size(); i++)
@@ -441,8 +441,8 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   for( c = 0; c < nrow; c++)
   {
 
-      lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
-      //ExecuteKernel(c, nrow, A_ref.colors);
+      //lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
+      ExecuteKernel(c, nrow, A_ref.colors);
       //std::cout << "c : " << c << std::endl;
       int left = std::count(A_ref.colors.begin(), A_ref.colors.end(), -1);
         if(left == 0)
