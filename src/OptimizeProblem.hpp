@@ -28,6 +28,10 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<loc
 void copy_value( std::vector<local_int_t> &dest,  std::vector<local_int_t> &source);
 int hash_function(int index , int nnz);
 void InitOpenCL(void);
+void InitCLMem(int row_size, int *row_offset, int *col_index, int *random);
+void ReleaseCLMem(void);
+void ExecuteKernel(int c, int row_size, std::vector<local_int_t> &iColors);
+
 
 void free_refmatrix_m(SparseMatrix &A);
 void copy_sparse_matrix_m(const SparseMatrix &A, SparseMatrix &A_ref);
