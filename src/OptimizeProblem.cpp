@@ -154,7 +154,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   
   // Calculate number of rows with the same color and save it in counter vector.
   std::vector<local_int_t> counters(c+1);
-  A_ref.counters.resize(c+5);
+  A_ref.counters.resize(c+1);
   std::fill(counters.begin(), counters.end(), 0);
   for (local_int_t i = 0; i < nrow; ++i)
   {
