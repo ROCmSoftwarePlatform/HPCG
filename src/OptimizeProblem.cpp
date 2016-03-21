@@ -24,291 +24,317 @@
 using namespace std;
 int row ;
 
-cl_platform_id *platform = NULL;
-cl_context context = 0;
-cl_device_id *device = NULL;
-cl_command_queue command_queue = 0;
-cl_program program = 0;
-cl_kernel  kernel = 0;
-cl_int err = CL_SUCCESS;
-cl_int cl_status = CL_SUCCESS;
+namespace hpcg_cl {
+  cl_platform_id *platform = NULL;
+  cl_context context = 0;
+  cl_device_id *device = NULL;
+  cl_command_queue command_queue = 0;
+  cl_program program = 0;
+  cl_kernel  kernel = 0;
+  cl_int err = CL_SUCCESS;
+  cl_int cl_status = CL_SUCCESS;
 
-cl_mem  clRow_offset = NULL;
-cl_mem  clCol_index = NULL;
-cl_mem  clColors = NULL;
-cl_mem  clRandom = NULL;
-cl_mem  clTemp = NULL;
+  cl_mem  clRow_offset = NULL;
+  cl_mem  clCol_index = NULL;
+  cl_mem  clColors = NULL;
+  cl_mem  clRandom = NULL;
+  cl_mem  clTemp = NULL;
 
-
-const char *kernel_name = "lubys_graph";
-const char *Lubys_graph_kernel = "                                                    \n\
-  __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_index, \n\
-                            __global int *Colors, __global int *random,               \n\
-                            __global int *temp)                                       \n\
-  {                                                                                   \n\
-    int x = get_global_id(0);                                                         \n\
-    int flag = 1;                                                                     \n\
-    if(temp[x] == -1)                                                                 \n\
-    {                                                                                 \n\
-      int ir = random[x];                                                             \n\
-      for(int k = row_offset[x]; k < row_offset[x + 1]; k++)                          \n\
-      {                                                                               \n\
-        int j = col_index[k];                                                         \n\
-        int jc = Colors[j];                                                           \n\
-        if (((jc != -1) && (jc != c)) || (x == j))                                    \n\
-        {                                                                             \n\
-          continue;                                                                   \n\
-        }                                                                             \n\
-        int jr = random[j];                                                           \n\
-        if(ir <= jr)                                                                  \n\
-        {                                                                             \n\
-          flag = 0;                                                                   \n\
-        }                                                                             \n\
-      }                                                                               \n\
-      if(flag)                                                                        \n\
-      {                                                                               \n\
-        temp[x] = c;                                                                  \n\
-      }                                                                               \n\
-    }                                                                                 \n\
-  }                                                                                   \n\
-  ";
-
-void InitOpenCL(void)
-{
-  if (NULL != platform)
-  {
-    return;
-  }
-
-  cl_uint ret_num_of_platforms = 0;
-  cl_int err = clGetPlatformIDs(0, NULL, &ret_num_of_platforms);
-  assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
-  if (err != CL_SUCCESS || 0 == ret_num_of_platforms)
-  {
-    std::cout << "ERROR: Getting platforms!" << std::endl;
-    return;
-  }
-
-  platform = (cl_platform_id*)malloc(ret_num_of_platforms * sizeof(cl_platform_id));
-  err = clGetPlatformIDs(ret_num_of_platforms, platform, 0);
-  assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
-
-  cl_uint ret_num_of_devices = 0;
-  err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 0, NULL, &ret_num_of_devices);
-
-  assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
-
-  device = (cl_device_id*)malloc(ret_num_of_devices * sizeof(cl_device_id));
-  err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_GPU , ret_num_of_devices, device, 0);
-  assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
-
-  cl_context_properties property[] = {CL_CONTEXT_PLATFORM,
-                                      (cl_context_properties)(platform[0]),
-                                      0};
-
-  context = clCreateContext(property, ret_num_of_devices, &device[0], NULL, NULL, &err);
-  assert(err == CL_SUCCESS && "clCreateContext failed\n");
-
-  command_queue = clCreateCommandQueue(context, device[0], 0, &err);
-  assert(err == CL_SUCCESS && "clCreateCommandQueue failed \n");
-
-  return;
-}
-
-void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
-{
-  if (NULL == clRow_offset)
-  {
-    clRow_offset = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                  (row_size + 1) * sizeof(int), row_offset, &cl_status);
-    if (CL_SUCCESS != cl_status || NULL == clRow_offset)
-    {
-      std::cout << "clRow_offset allocation failed. status: " << cl_status << std::endl;
-      return;
-    }
-  }
-
-  if (NULL == clCol_index)
-  {
-    clCol_index = clCreateBuffer(context, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR,
-                                 (row_size * 27) * sizeof(int), col_index, &cl_status);
-    if (CL_SUCCESS != cl_status || NULL == clCol_index)
-    {
-      std::cout << "clCol_index allocation failed. status: " << cl_status << std::endl;
-      return;
-    }
-  }
-
-  if (NULL == clColors)
-  {
-    clColors = clCreateBuffer(context, CL_MEM_READ_WRITE, row_size * sizeof(int),
-                              NULL, &cl_status);
-    if (CL_SUCCESS != cl_status || NULL == clColors)
-    {
-      std::cout << "clColors allocation failed. status: " << cl_status << std::endl;
-      return;
-    }
-  }
-
-  if (NULL == clRandom)
-  {
-    clRandom = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                              row_size * sizeof(int), random, &cl_status);
-    if (CL_SUCCESS != cl_status || NULL == clRandom)
-    {
-      std::cout << "clRandom allocation failed. status: " << cl_status << std::endl;
-      return;
-    }
-  }
-
-  if (NULL == clTemp)
-  {
-    clTemp = clCreateBuffer(context, CL_MEM_READ_WRITE, row_size * sizeof(int),
-                          NULL, &cl_status);
-    if (CL_SUCCESS != cl_status || NULL == clTemp)
-    {
-      std::cout << "clTemp allocation failed. status: " << cl_status << std::endl;
-      return;
-    }
-  }
-
-  return;
-}
-
-void ReleaseCLMem(void)
-{
-  cl_status = CL_SUCCESS;
-
-  if (NULL != clRow_offset)
-  {
-    cl_status |= clReleaseMemObject(clRow_offset);
-    clRow_offset = NULL;
-  }
-
-  if (NULL != clCol_index)
-  {
-    cl_status |= clReleaseMemObject(clCol_index);
-    clCol_index = NULL;
-  }
-
-  if (NULL != clColors)
-  {
-    cl_status |= clReleaseMemObject(clColors);
-    clColors = NULL;
-  }
-
-  if (NULL != clRandom)
-  {
-    cl_status |= clReleaseMemObject(clRandom);
-    clRandom = NULL;
-  }
-
-  if (NULL != clTemp)
-  {
-    cl_status |= clReleaseMemObject(clTemp);
-    clTemp = NULL;
-  }
-
-  if (CL_SUCCESS != cl_status)
-  {
-    std::cout << "clReleaseMemObject failed." <<std::endl;
-  }
-
-  return;
-}
-
-void ExecuteKernel(int c, int row_size, std::vector<local_int_t> &iColors)
-{
+  int allocSize = 0;
   int *colors = NULL;
 
-  assert(row_size == iColors.size());
+  const char *kernel_name = "lubys_graph";
+  const char *Lubys_graph_kernel = "                                                    \n\
+    __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_index, \n\
+                              __global int *Colors, __global int *random,               \n\
+                              __global int *temp)                                       \n\
+    {                                                                                   \n\
+      int x = get_global_id(0);                                                         \n\
+      int flag = 1;                                                                     \n\
+      if(temp[x] == -1)                                                                 \n\
+      {                                                                                 \n\
+        int ir = random[x];                                                             \n\
+        for(int k = row_offset[x]; k < row_offset[x + 1]; k++)                          \n\
+        {                                                                               \n\
+          int j = col_index[k];                                                         \n\
+          int jc = Colors[j];                                                           \n\
+          if (((jc != -1) && (jc != c)) || (x == j))                                    \n\
+          {                                                                             \n\
+            continue;                                                                   \n\
+          }                                                                             \n\
+          int jr = random[j];                                                           \n\
+          if(ir <= jr)                                                                  \n\
+          {                                                                             \n\
+            flag = 0;                                                                   \n\
+          }                                                                             \n\
+        }                                                                               \n\
+        if(flag)                                                                        \n\
+        {                                                                               \n\
+          temp[x] = c;                                                                  \n\
+        }                                                                               \n\
+      }                                                                                 \n\
+    }                                                                                   \n\
+    ";
 
-  colors = (int *)malloc(sizeof(int) * row_size);
-
-  if (NULL == colors)
+  void InitOpenCL(void)
   {
+    if (NULL != platform)
+    {
+      return;
+    }
+
+    cl_uint ret_num_of_platforms = 0;
+    cl_int err = clGetPlatformIDs(0, NULL, &ret_num_of_platforms);
+    assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
+    if (err != CL_SUCCESS || 0 == ret_num_of_platforms)
+    {
+      std::cout << "ERROR: Getting platforms!" << std::endl;
+      return;
+    }
+
+    platform = (cl_platform_id*)malloc(ret_num_of_platforms * sizeof(cl_platform_id));
+    err = clGetPlatformIDs(ret_num_of_platforms, platform, 0);
+    assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
+
+    cl_uint ret_num_of_devices = 0;
+    err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 0, NULL, &ret_num_of_devices);
+
+    assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
+
+    device = (cl_device_id*)malloc(ret_num_of_devices * sizeof(cl_device_id));
+    err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_GPU , ret_num_of_devices, device, 0);
+    assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
+
+    cl_context_properties property[] = {CL_CONTEXT_PLATFORM,
+                                        (cl_context_properties)(platform[0]),
+                                        0};
+
+    context = clCreateContext(property, ret_num_of_devices, &device[0], NULL, NULL, &err);
+    assert(err == CL_SUCCESS && "clCreateContext failed\n");
+
+    command_queue = clCreateCommandQueue(context, device[0], 0, &err);
+    assert(err == CL_SUCCESS && "clCreateCommandQueue failed \n");
+
     return;
   }
 
-  //std::copy(iColors.begin(), iColors.end(), colors);
-  for (int i = 0; i < iColors.size(); i++)
+  void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
   {
-    colors[i] = iColors[i];
-  }
-
-  cl_status = clEnqueueWriteBuffer(command_queue, clColors, CL_TRUE, 0, row_size * sizeof(int),
-                                   colors, 0, NULL, NULL);
-
-  cl_status |= clEnqueueWriteBuffer(command_queue, clTemp, CL_TRUE, 0, row_size * sizeof(int),
-                                    colors, 0, NULL, NULL);
-  if (CL_SUCCESS != cl_status)
-  {
-    std::cout << "DMA failed, status:" << cl_status << std::endl;
-  }
-
-  size_t sourceSize[] = { strlen(Lubys_graph_kernel) };
-  if (!program)
-  {
-    program = clCreateProgramWithSource(context, 1, &Lubys_graph_kernel,
-                                        sourceSize, &cl_status);
-    if (CL_SUCCESS != cl_status)
+    if (NULL == clRow_offset)
     {
-      std::cout << "create program failed. status:" << cl_status << std::endl;
-      return;
+      clRow_offset = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                    (row_size + 1) * sizeof(int), row_offset, &cl_status);
+      if (CL_SUCCESS != cl_status || NULL == clRow_offset)
+      {
+        std::cout << "clRow_offset allocation failed. status: " << cl_status << std::endl;
+        return;
+      }
     }
 
-    cl_status = clBuildProgram(program, 1, &device[0], NULL, NULL, NULL);
-    if (CL_SUCCESS != cl_status)
+    if (NULL == clCol_index)
     {
-      std::cout << "clBuild failed. status:" << cl_status << std::endl;
-      char tbuf[0x10000];
-      clGetProgramBuildInfo(program, device[0], CL_PROGRAM_BUILD_LOG, 0x10000, tbuf, NULL);
-      std::cout << tbuf <<std::endl;
-      return;
+      clCol_index = clCreateBuffer(context, CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR,
+                                   (row_size * 27) * sizeof(int), col_index, &cl_status);
+      if (CL_SUCCESS != cl_status || NULL == clCol_index)
+      {
+        std::cout << "clCol_index allocation failed. status: " << cl_status << std::endl;
+        return;
+      }
     }
-  }
 
-  if (!kernel)
-  {
-    kernel = clCreateKernel(program, kernel_name, &cl_status);
-    if (CL_SUCCESS != cl_status)
+    if (NULL == clColors)
     {
-      std::cout << "create kernel failed. status:" << cl_status << std::endl;
-      return;
+      clColors = clCreateBuffer(context, CL_MEM_READ_WRITE, row_size * sizeof(int),
+                                NULL, &cl_status);
+      if (CL_SUCCESS != cl_status || NULL == clColors)
+      {
+        std::cout << "clColors allocation failed. status: " << cl_status << std::endl;
+        return;
+      }
     }
-  }
 
-  cl_int c1 = c;
-  clSetKernelArg(kernel, 0, sizeof(cl_int), (void *)&c1);
-  clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&clRow_offset);
-  clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&clCol_index);
-  clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&clColors);
-  clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&clRandom);
-  clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&clTemp);
+    if (NULL == clRandom)
+    {
+      clRandom = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                row_size * sizeof(int), random, &cl_status);
+      if (CL_SUCCESS != cl_status || NULL == clRandom)
+      {
+        std::cout << "clRandom allocation failed. status: " << cl_status << std::endl;
+        return;
+      }
+    }
 
-  size_t global_size[] = {row_size};
-  cl_status = clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL,
-                                     global_size, NULL, 0, NULL, NULL);
-  if (CL_SUCCESS != cl_status)
-  {
-    std::cout << "NDRange failed. status:" << cl_status << std::endl;
+    if (NULL == clTemp)
+    {
+      clTemp = clCreateBuffer(context, CL_MEM_READ_WRITE, row_size * sizeof(int),
+                            NULL, &cl_status);
+      if (CL_SUCCESS != cl_status || NULL == clTemp)
+      {
+        std::cout << "clTemp allocation failed. status: " << cl_status << std::endl;
+        return;
+      }
+    }
+
     return;
   }
 
-  clFinish(command_queue);
-
-  cl_status |= clEnqueueReadBuffer(command_queue, clTemp, CL_TRUE, 0,
-                                   row_size * sizeof(int), colors, 0, NULL, NULL);
-
-  //std::copy(colors, colors + row_size, iColors.begin());
-  for (int i = 0; i < iColors.size(); i++)
+  void InitCpuMem(int size)
   {
-    iColors[i] = colors[i];
+    if (NULL == colors)
+    {
+      colors = (int *)malloc(size);
+      allocSize = size;
+    }
+
+    return;
   }
 
-  free(colors);
+  void ReleaseCLMem(void)
+  {
+    cl_status = CL_SUCCESS;
 
-  return;
+    if (NULL != clRow_offset)
+    {
+      cl_status |= clReleaseMemObject(clRow_offset);
+      clRow_offset = NULL;
+    }
+
+    if (NULL != clCol_index)
+    {
+      cl_status |= clReleaseMemObject(clCol_index);
+      clCol_index = NULL;
+    }
+
+    if (NULL != clColors)
+    {
+      cl_status |= clReleaseMemObject(clColors);
+      clColors = NULL;
+    }
+
+    if (NULL != clRandom)
+    {
+      cl_status |= clReleaseMemObject(clRandom);
+      clRandom = NULL;
+    }
+
+    if (NULL != clTemp)
+    {
+      cl_status |= clReleaseMemObject(clTemp);
+      clTemp = NULL;
+    }
+
+    if (CL_SUCCESS != cl_status)
+    {
+      std::cout << "clReleaseMemObject failed." <<std::endl;
+    }
+
+    return;
+  }
+
+  void ReleaseCpuMem(void **pColors)
+  {
+    if (NULL != (*pColors))
+    {
+      free(*pColors);
+      *pColors = NULL;
+      allocSize = 0;
+    }
+
+    return;
+  }
+
+  void WriteBuffer(std::vector<local_int_t> &iColors, cl_mem clBuf)
+  {
+    cl_status = CL_SUCCESS;
+
+    assert(allocSize == iColors.size() * sizeof(int));
+    assert(NULL != colors);
+    std::copy(iColors.begin(), iColors.end(), colors);
+
+    cl_status = clEnqueueWriteBuffer(command_queue, clBuf, CL_TRUE, 0, allocSize,
+                                     colors, 0, NULL, NULL);
+    if (CL_SUCCESS != cl_status)
+    {
+      std::cout << "write buffer failed, status:" << cl_status << std::endl;
+    }
+
+    return;
+  }
+
+  void ReadBuffer(std::vector<local_int_t> &iColors, cl_mem clBuf)
+  {
+    cl_status = CL_SUCCESS;
+
+    assert(allocSize == iColors.size() * sizeof(int));
+    assert(NULL != colors);
+
+    cl_status |= clEnqueueReadBuffer(command_queue, clBuf, CL_TRUE, 0,
+                                     allocSize, colors, 0, NULL, NULL);
+    if (CL_SUCCESS != cl_status)
+    {
+      std::cout << "read buffer failed, status:" << cl_status << std::endl;
+    }
+
+    std::copy(colors, colors + iColors.size(), iColors.begin());
+
+    return;
+  }
+
+  void ExecuteKernel(int c, int row_size, cl_mem clMemColors, cl_mem clMemTemp)
+  {
+    size_t sourceSize[] = { strlen(Lubys_graph_kernel) };
+    if (!program)
+    {
+      program = clCreateProgramWithSource(context, 1, &Lubys_graph_kernel,
+                                          sourceSize, &cl_status);
+      if (CL_SUCCESS != cl_status)
+      {
+        std::cout << "create program failed. status:" << cl_status << std::endl;
+        return;
+      }
+
+      cl_status = clBuildProgram(program, 1, &device[0], NULL, NULL, NULL);
+      if (CL_SUCCESS != cl_status)
+      {
+        std::cout << "clBuild failed. status:" << cl_status << std::endl;
+        char tbuf[0x10000];
+        clGetProgramBuildInfo(program, device[0], CL_PROGRAM_BUILD_LOG, 0x10000, tbuf, NULL);
+        std::cout << tbuf <<std::endl;
+        return;
+      }
+    }
+
+    if (!kernel)
+    {
+      kernel = clCreateKernel(program, kernel_name, &cl_status);
+      if (CL_SUCCESS != cl_status)
+      {
+        std::cout << "create kernel failed. status:" << cl_status << std::endl;
+        return;
+      }
+    }
+
+    cl_int c1 = c;
+    clSetKernelArg(kernel, 0, sizeof(cl_int), (void *)&c1);
+    clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&clRow_offset);
+    clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&clCol_index);
+    clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&clMemColors);
+    clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&clRandom);
+    clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&clMemTemp);
+
+    size_t global_size[] = {row_size};
+    cl_status = clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL,
+                                       global_size, NULL, 0, NULL, NULL);
+    if (CL_SUCCESS != cl_status)
+    {
+      std::cout << "NDRange failed. status:" << cl_status << std::endl;
+      return;
+    }
+
+    clFinish(command_queue);
+
+    return;
+  }
 }
 
 /*!
@@ -430,11 +456,18 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
      ridx++;
   }
 
-  InitOpenCL();
+  hpcg_cl::InitOpenCL();
 
-  InitCLMem(nrow, row_offset, col_index, random);
+  hpcg_cl::InitCLMem(nrow, row_offset, col_index, random);
+
+  hpcg_cl::InitCpuMem(nrow * sizeof(int));
 
   //std::cout << "size: " << nrow << std::endl;
+
+  hpcg_cl::WriteBuffer(A_ref.colors, hpcg_cl::clColors);
+  hpcg_cl::WriteBuffer(A_ref.colors, hpcg_cl::clTemp);
+  cl_mem clColors;
+  cl_mem clTemp;
 
   // Call luby's graph coloring algorithm.
   int c = 0;
@@ -442,14 +475,28 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   {
 
       //lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
-      ExecuteKernel(c, nrow, A_ref.colors);
+      if (c % 2 == 0)
+      {
+        clColors = hpcg_cl::clColors;
+        clTemp = hpcg_cl::clTemp;
+      }
+      else
+      {
+        clColors = hpcg_cl::clTemp;
+        clTemp = hpcg_cl::clColors;
+      }
+      hpcg_cl::ExecuteKernel(c, nrow, clColors, clTemp);
+
+      hpcg_cl::ReadBuffer(A_ref.colors, clTemp);
       //std::cout << "c : " << c << std::endl;
       int left = std::count(A_ref.colors.begin(), A_ref.colors.end(), -1);
         if(left == 0)
           break;
   }
 
-  ReleaseCLMem();
+  hpcg_cl::ReleaseCLMem();
+
+  hpcg_cl::ReleaseCpuMem((void **)&hpcg_cl::colors);
 
   // Calculate number of rows with the same color and save it in counter vector.
   std::vector<local_int_t> counters(c+1);
