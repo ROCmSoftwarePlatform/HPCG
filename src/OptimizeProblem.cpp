@@ -71,15 +71,17 @@ void copy_value( std::vector<local_int_t> &dest,  std::vector<local_int_t> &sour
 
 void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<local_int_t> &colors,int *random,std::vector<local_int_t> &temp)
 {
-
-    copy_value(temp,colors);
-    for(int i=0;i<row;i++)
+    //copy_value(temp,colors);
+    std::copy(colors.begin(), colors.end(), temp.begin());
+    for(int i=0; i<row; i++)
     {
        int flag = 1;
        if(temp[i] != -1)
-          continue;
+       {
+           continue;
+       }
        int ir = random[i];
-       for(int k=row_offset[i];k<row_offset[i+1];k++)
+       for(int k=row_offset[i]; k<row_offset[i+1]; k++)
        {
           int j = col_index[k];
           int jc = colors[j];
@@ -91,11 +93,11 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<loc
        }
        if(flag)
        {
-        temp[i] = c;
+           temp[i] = c;
        }
-        
     }
-    copy_value(colors,temp);
+    //copy_value(colors,temp);
+    std::copy(temp.begin(), temp.end(), colors.begin());
 }
 
 
@@ -108,20 +110,13 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   int *row_offset,*col_index;
   col_index = new int [nrow * 27];
   row_offset = new int [(nrow + 1)];
-
- // Initialize local Color array and random array using hash functions.
-  for (int i = 0; i < nrow; i++)
-  {
-      //Colors[i] = -1;
-      random[i] = hash_function(i,A.nonzerosInRow[i]);
-  }
   row_offset[0] = 0;
 
-
-  int k = 0;
+  // Initialize local Color array and random array using hash functions.
   // Save the mtxIndL in a single dimensional array for column index reference.
-  for(int i = 0; i < nrow; i++)
+  for(int k = 0, i = 0; i < nrow; i++)
   {
+    random[i] = (i * (unsigned int)row) + A.nonzerosInRow[i];
     for(int j = 0; j < A.nonzerosInRow[i]; j++)
     {
         col_index[k] = A.mtxIndL[i][j];
@@ -129,8 +124,6 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
     }
   }
   
- 
-  k = 0;
   // Calculate the row offset.
   int ridx = 1;
   int sum = 0;
