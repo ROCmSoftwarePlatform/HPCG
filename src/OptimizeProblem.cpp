@@ -20,7 +20,6 @@
 
 #include "OptimizeProblem.hpp"
 #include <iostream>
-#include <CL/cl.hpp>
 using namespace std;
 int row ;
 
@@ -278,6 +277,21 @@ namespace hpcg_cl {
     std::copy(colors, colors + iColors.size(), iColors.begin());
 
     return;
+  }
+
+  cl_command_queue getCommandQueue(void)
+  {
+    return command_queue;
+  }
+
+  cl_context getContext(void)
+  {
+    return context;
+  }
+
+  cl_device_id getDeviceId(void)
+  {
+    return device[0];
   }
 
   void ExecuteKernel(int c, int row_size, cl_mem clMemColors, cl_mem clMemTemp)
