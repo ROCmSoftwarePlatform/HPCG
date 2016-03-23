@@ -52,7 +52,7 @@ PRIMARY_HEADERS = HPCG_SRC_PATH/src/Geometry.hpp HPCG_SRC_PATH/src/SparseMatrix.
 all: bin/xhpcg
 
 bin/xhpcg: src/main.o $(HPCG_DEPS)
-	$(LINKER) $(LINKFLAGS) src/main.o $(HPCG_DEPS) $(HPCG_LIBS) -o bin/xhpcg
+	$(LINKER) src/main.o $(HPCG_DEPS) $(HPCG_LIBS) $(LINKFLAGS) -o bin/xhpcg
 
 clean:
 	rm -f src/*.o bin/xhpcg
