@@ -17,7 +17,6 @@
 #include "Vector.hpp"
 int ComputeDotProduct(const local_int_t n, const Vector & x, const Vector & y,
     double & result, double & time_allreduce, bool & isOptimized);
-int ComputeDotProduct_rr(const local_int_t n, const Vector & x, const Vector & y,
-    double & result, double & time_allreduce, bool & isOptimized);
+int ComputeDotProduct_rr(double & result);
 
 #endif // COMPUTEDOTPRODUCT_HPP

@@ -77,8 +77,7 @@ int ComputeDotProduct(const local_int_t n, const Vector & h_x, const Vector & h_
   return 0;                                                                       
 }
 
-int ComputeDotProduct_rr(const local_int_t n, const Vector & h_x, const Vector & h_y,
-    double & result, double & time_allreduce, bool & isOptimized) {
+int ComputeDotProduct_rr(double & result) {
   status = cldenseDdot(&d_beta, &y, &y, createResult.control);
 
   if (status != clsparseSuccess)

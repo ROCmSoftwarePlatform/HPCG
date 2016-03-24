@@ -91,8 +91,7 @@ int ComputeWAXPBY(const local_int_t n, const double h_alpha, const Vector & h_x,
   return 0;
 }
 
-int ComputeWAXPBY_bApr(const local_int_t n, const double h_alpha, const Vector & h_x,
-    const double h_beta, const Vector & h_y, Vector & h_w, bool & isOptimized) {
+int ComputeWAXPBY_bApr(const local_int_t n, const Vector & h_x, const double h_beta) {
 
   static int count_axpby;
   if (!count_axpby)

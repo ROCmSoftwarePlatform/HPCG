@@ -84,8 +84,8 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
   // p is of length ncols, copy x to p for sparse MV operation
   CopyVector(x, p);
   TICK(); ComputeSPMV_apAp(A, p, Ap); TOCK(t3); // Ap = A*p
-  TICK(); ComputeWAXPBY_bApr(nrow, 1.0, b, -1.0, Ap, r, A.isWaxpbyOptimized);  TOCK(t2); // r = b - Ax (x stored in p)
-  TICK(); ComputeDotProduct_rr(nrow, r, r, normr, t4, A.isDotProductOptimized); TOCK(t1);
+  TICK(); ComputeWAXPBY_bApr(nrow, b, -1.0);  TOCK(t2); // r = b - Ax (x stored in p)
+  TICK(); ComputeDotProduct_rr(normr); TOCK(t1);
   normr = sqrt(normr);
 #ifdef HPCG_DEBUG
   if (A.geom->rank==0) HPCG_fout << "Initial Residual = "<< normr << std::endl;
