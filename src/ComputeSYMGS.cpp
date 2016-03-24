@@ -49,13 +49,13 @@ namespace SYMGSKernel
       double sum = rv[idx];                                                                   \n\
       for (int j = 0; j < currentNumberOfNonzeros; j++)                                       \n\
       {                                                                                       \n\
-        int curCol = mtxIndL[j];                                                              \n\
-        sum -= matrixValues[j] * xv[curCol];                                                  \n\
+        int curCol = mtxIndL[idx * 27 + j];                                                              \n\
+        sum -= matrixValues[idx * 27 + j];                                                  \n\
       }                                                                                       \n\
                                                                                               \n\
-      sum += xv[idx + offset] * matrixDiagonal[idx];                                                \n\
+      sum += matrixDiagonal[idx];                                                \n\
                                                                                               \n\
-      xv[idx + offset] = sum / matrixDiagonal[idx];                                                 \n\
+      xv[idx] = sum / matrixDiagonal[idx];                                                 \n\
     }";
 
   void InitCLMem(int localNumberOfRows)
@@ -230,14 +230,15 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
   const double * const rv = r.values;
   double * const xv = x.values;
 
-  SYMGSKernel::InitCLMem(nrow);
-  SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
+  //SYMGSKernel::InitCLMem(nrow);
+  //SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
 
   // forward sweep to be carried out in parallel.
   local_int_t i = 0;
   int k;
   for(k = 1; k < (int)(A.counters.size() -1); k++)
   {
+#if 1
       //int max = (nrow < (A.counters[k] + 1)) ? (i < nrow ? nrow : i) : (i < (A.counters[k] + 1) ? (A.counters[k] + 1) : i);
       int max = 0;
       if (nrow < (A.counters[k] + 1))
@@ -263,21 +264,38 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
         }
       }
 
-      double *dlMatrixDiagonal = new double[max];
+      double *dlMatrixValues = new double[(max - i) * 27];
+      int  *iMtxIndL = new int[(max - i) * 27];
+      double *dlMatrixDiagonal = new double[(max - i)];
+      char *cNonzerosInRow = new char[(max - i)];
+      double *dlRv = new double[(max - i)];
+      double *dlXv = new double[(max - i)];
       for (int index = 0; index < (max - i); index++)
       {
+        const double * const currentValues = A.matrixValues[i + index];
+        const local_int_t * const currentColIndices = A.mtxIndL[i + index];
         dlMatrixDiagonal[index] = matrixDiagonal[i + index][0];
+        for (int m = 0; m < 27; m++)
+        {
+          dlMatrixValues[index * 27 + m] = currentValues[m];
+          iMtxIndL[index * 27 + m] = currentColIndices[m];
+        }
+        cNonzerosInRow[index] = A.nonzerosInRow[i + index];
+        dlRv[index] = r.values[i + index];
+        dlXv[index] = x.values[i + index];
       }
 
       SYMGSKernel::clMatrixValues = SYMGSKernel::CreateCLBuf(
                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                (max - i) * sizeof(double), (void *)(A.matrixValues[i]));
+                                (max - i) * 27 * sizeof(double),
+                                (void *)dlMatrixValues);
 
       SYMGSKernel::clMtxIndL = SYMGSKernel::CreateCLBuf(
                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                (max - i) * sizeof(int), (void *)(A.mtxIndL[i]));
+                                (max - i) * 27 * sizeof(int),
+                                (void *)iMtxIndL);
 
-      SYMGSKernel::clNonzerosInRow = SYMGSKernel::CreateCLBuf(
+      /*SYMGSKernel::clNonzerosInRow = SYMGSKernel::CreateCLBuf(
                                 CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                 (max - i) * sizeof(char), (void *)(A.nonzerosInRow + i));
 
@@ -287,20 +305,53 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
 
       double *dlRv = r.values + i;
       SYMGSKernel::clRv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                                   (max - i) * sizeof(double), (void *)dlRv);
+                                                   (max - i) * sizeof(double), (void *)dlRv);*/
+
+      SYMGSKernel::clNonzerosInRow = SYMGSKernel::CreateCLBuf(
+                                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                (max - i) * sizeof(char),
+                                (void *)cNonzerosInRow);
+
+      SYMGSKernel::clMatrixDiagonal = SYMGSKernel::CreateCLBuf(
+                                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                (max - i) * sizeof(double), (void *)dlMatrixDiagonal);
+
+      SYMGSKernel::clRv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                                   (max - i) * sizeof(double),
+                                                   (void *)dlRv);
+      SYMGSKernel::clXv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+                                                   (max - i) * sizeof(double),
+                                                   (void *)dlXv);
 
       SYMGSKernel::ExecuteKernel(max - i, i);
+
+      SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)dlXv,
+                              (max - i) * sizeof(double));
+      for (int index = 0; index < (max - i); index++)
+      {
+        x.values[i + index] = dlXv[index];
+      }
 
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMatrixValues);
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMtxIndL);
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clNonzerosInRow);
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMatrixDiagonal);
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clRv);
-      SYMGSKernel::ReleaseKernel(&SYMGSKernel::kernel);
-      SYMGSKernel::ReleaseProgram(&SYMGSKernel::program);
+      SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clXv);
+      //SYMGSKernel::ReleaseKernel(&SYMGSKernel::kernel);
+      //SYMGSKernel::ReleaseProgram(&SYMGSKernel::program);
 
+      i += (max - i);
 
-      /*for (; i< nrow && (i <= A.counters[k]); i++) {
+      delete [] dlMatrixDiagonal;
+      delete [] dlMatrixValues;
+      delete [] iMtxIndL;
+      delete [] cNonzerosInRow;
+      delete [] dlRv;
+      delete [] dlXv;
+#else
+
+  for (; i< nrow && (i <= A.counters[k]); i++) {
       const double * const currentValues = A.matrixValues[i];
       const local_int_t * const currentColIndices = A.mtxIndL[i];
       const int currentNumberOfNonzeros = A.nonzerosInRow[i];
@@ -309,20 +360,24 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
 
       for (int j=0; j< currentNumberOfNonzeros; j++) {
         local_int_t curCol = currentColIndices[j];
-        sum -= currentValues[j] * xv[curCol];
+        //sum -= currentValues[j] * xv[curCol];
+        sum -= currentValues[j];
       }
 
-      sum += xv[i]*currentDiagonal; // Remove diagonal contribution from previous loop
+      //sum += xv[i]*currentDiagonal; // Remove diagonal contribution from previous loop
+
+      sum += currentDiagonal;
 
       xv[i] = sum/currentDiagonal;
-    }*/
-
-    i += max;
-
-    delete [] dlMatrixDiagonal;
+    }
+#endif
   }
 
- SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
+  for (int index = 0; index < nrow; index++)
+  {
+    std::cout << " " << xv[index];
+  }
+  std::cout << std::endl;
 
  // backward sweep to be computed in parallel.
  i = nrow - 1;
