@@ -19,6 +19,7 @@
  */
 
 #include "OptimizeProblem.hpp"
+#include <algorithm>
 /*!
   Optimizes the data structures used for CG iteration to increase the
   performance of the benchmark version of the preconditioned CG algorithm.
@@ -34,6 +35,97 @@
   @see GenerateGeometry
   @see GenerateProblem
 */
+
+// leveling to find levels based on dependency to be deployed in level scheduling algorithm.
+
+void  leveling(SparseMatrix &A){  
+  
+  std::vector<int> root_nodes(A.localNumberOfRows,-1);
+  double ** matrix = new double*[A.localNumberOfRows];
+  for(int i = 0; i < A.localNumberOfRows; i++)
+  {
+    matrix[i] = new double[27];
+  }
+  int root_count;
+  int flag = 1;
+  int k = 0;
+  A.level_no = 0;
+
+  for(int i = 0; i < A.localNumberOfRows; i++)
+  {
+    for(int j = 0; j < A.nonzerosInRow[i]; j++)
+    {
+      matrix[i][j] = A.matrixValues[i][j];
+    }
+  }
+
+  while(1)
+  {  
+     flag = 1;
+     k = 0;
+
+    for (int i = 0; i < A.localNumberOfRows ; i++)
+    {   
+      if(A.level_array[i] == -1)
+      {
+        for(int j = 0;j < A.nonzerosInRow[i] ;j++)
+        {
+          if(i > A.mtxIndL[i][j])
+          {
+            if(matrix[i][j] != 0)
+              flag = 0;
+            else
+              continue;
+          }
+        }
+        if(flag)
+        {
+          root_nodes[k++] = i;
+        }
+      }
+    }
+
+    root_count = std::count(root_nodes.begin(), root_nodes.end(), -1);
+         
+    for(int m = 0; m < k; m++)
+    {
+       for(int i = 0; i < A.localNumberOfRows; i++)
+       {
+          for(int j = 0; j < A.nonzerosInRow[i]; j++)
+          {
+            if(i > j)
+            {
+              if(A.mtxIndL[i][j] == root_nodes[m])
+              {
+                //std::cerr<<"removing k dependency"<<std::endl;
+                matrix[i][j] = 0;
+              }
+            }
+            else
+              continue;
+          }
+       }
+    }
+     
+
+    for(int i = 0 ;root_nodes[i]!=-1;i++)
+    {
+      A.level_array[root_nodes[i]] = A.level_no;
+      root_nodes[i] = -1;
+    }
+
+    int left = std::count(A.level_array.begin(), A.level_array.end(), -1);    
+    if(left == 0 || A.level_no > A.localNumberOfRows)
+      break;
+    A.level_no++;
+ }
+ for(int i = 0; i < A.localNumberOfRows; i++)
+ {
+  delete [] matrix[i];
+ }
+ delete [] matrix;
+}
+
 int OptimizeProblem(SparseMatrix & A, CGData & data, Vector & b, Vector & x, Vector & xexact) {
 
   // This function can be used to completely transform any part of the data structures.

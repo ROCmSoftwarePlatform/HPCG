@@ -18,8 +18,13 @@
  HPCG routine
  */
 
-#include "ComputeSYMGS.hpp"
+
+ #ifndef HPCG_NO_MPI
+#include "ExchangeHalo.hpp"
+#endif
 #include "ComputeSYMGS_ref.hpp"
+#include "ComputeSYMGS.hpp"
+#include <cassert>
 
 /*!
   Routine to one step of symmetrix Gauss-Seidel:
@@ -49,7 +54,67 @@
 */
 int ComputeSYMGS( const SparseMatrix & A, const Vector & r, Vector & x) {
 
-  // This line and the next two lines should be removed and your version of ComputeSYMGS should be used.
-  return ComputeSYMGS_ref(A, r, x);
+  
+  assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for halo values
 
+#ifndef HPCG_NO_MPI
+  ExchangeHalo(A,x);
+#endif
+
+  const local_int_t nrow = A.localNumberOfRows;
+  double ** matrixDiagonal = A.matrixDiagonal;  // An array of pointers to the diagonal entries A.matrixValues
+  const double * const rv = r.values;
+  double * const xv = x.values;
+
+  // implemented level scheduling algorithm for forward sweep
+  int level = 0;
+  while(level <= A.level_no)
+  {
+    for (local_int_t i=0; i< nrow; i++) {
+      if(A.level_array[i] == level)
+      {
+          const double * const currentValues = A.matrixValues[i];
+          const local_int_t * const currentColIndices = A.mtxIndL[i];
+          const int currentNumberOfNonzeros = A.nonzerosInRow[i];
+          const double  currentDiagonal = matrixDiagonal[i][0]; // Current diagonal value
+          double sum = rv[i]; // RHS value
+
+          for (int j=0; j< currentNumberOfNonzeros; j++) {
+            local_int_t curCol = currentColIndices[j];
+            sum -= currentValues[j] * xv[curCol];
+          }
+          sum += xv[i]*currentDiagonal; // Remove diagonal contribution from previous loop
+
+          xv[i] = sum/currentDiagonal;
+      }
+    }
+    level++;
+  }
+
+  // implemented level scheduling algorithm for backward sweep.
+  level = A.level_no;
+  while(level >= 0)
+  {
+    for (local_int_t i=nrow-1; i>=0; i--) {
+      if(A.level_array[i] == level)
+      {
+        const double * const currentValues = A.matrixValues[i];
+        const local_int_t * const currentColIndices = A.mtxIndL[i];
+        const int currentNumberOfNonzeros = A.nonzerosInRow[i];
+        const double  currentDiagonal = matrixDiagonal[i][0]; // Current diagonal value
+        double sum = rv[i]; // RHS value
+
+        for (int j = 0; j< currentNumberOfNonzeros; j++) {
+          local_int_t curCol = currentColIndices[j];
+          sum -= currentValues[j]*xv[curCol];
+        }
+        sum += xv[i]*currentDiagonal; // Remove diagonal contribution from previous loop
+
+        xv[i] = sum/currentDiagonal;
+      }
+    }
+    level--;
+  }
+
+  return 0;
 }

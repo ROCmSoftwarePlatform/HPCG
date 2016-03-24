@@ -47,6 +47,8 @@ struct SparseMatrix_STRUCT {
   mutable bool isSpmvOptimized;
   mutable bool isMgOptimized;
   mutable bool isWaxpbyOptimized;
+  std::vector<int> level_array; // store the corresponding level values for each row
+  int level_no; // store the number of levels
   /*!
    This is for storing optimized data structres created in OptimizeProblem and
    used inside optimized ComputeSPMV().

@@ -203,6 +203,7 @@ void GenerateProblem_ref(SparseMatrix & A, Vector * b, Vector * x, Vector * xexa
   A.mtxIndL = mtxIndL;
   A.matrixValues = matrixValues;
   A.matrixDiagonal = matrixDiagonal;
-
+  A.level_array.resize(A.localNumberOfRows);
+  std::fill(A.level_array.begin(), A.level_array.end(), -1);
   return;
 }

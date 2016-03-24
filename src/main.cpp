@@ -227,7 +227,14 @@ int main(int argc, char * argv[]) {
 
   // Call user-tunable set up function.
   double t7 = mytimer();
-  OptimizeProblem(A, data, b, x, xexact);
+
+  /* call leveling for all sparse matrices including coarse matrices and save the corresponding 
+  level order in level_array*/
+  leveling(A);
+  leveling(*A.Ac);
+  leveling(*A.Ac->Ac);
+  leveling(*A.Ac->Ac->Ac);
+
   t7 = mytimer() - t7;
   times[7] = t7;
 #ifdef HPCG_DEBUG
