@@ -40,7 +40,7 @@ clsparseScalar beta;
 cldenseVector x;
 cldenseVector y;
 clsparseCsrMatrix A;
-  
+
 double *val;
 int *col, *rowoff;
 //double spmv_time;
@@ -166,14 +166,6 @@ int clsparse_setup(const SparseMatrix hA, Vector hx, Vector hy)
  
 int hpcg2clsparse(const SparseMatrix & hA, Vector & hx, Vector & hy)
 {         
-  static int call_count;
-  
-  if (!call_count) 
-  {  
-    clsparse_setup(hA, hx, hy); 
-    ++call_count; 
-  } 
-    
   int k = 0;
   for(int i = 0; i < hA.totalNumberOfRows; i++) 
   {
@@ -237,4 +229,42 @@ int ComputeSPMV( const SparseMatrix & A, Vector & x, Vector & y) {
   
   
   
+}
+
+int hpcg2clsparse_apAp(const SparseMatrix & hA, Vector & hx, Vector & hy)
+{
+  static int call_count;
+
+  if (!call_count)
+  {
+    clsparse_setup(hA, hx, hy);
+    ++call_count;
+  }
+  int k = 0;
+  for(int i = 0; i < hA.totalNumberOfRows; i++)
+  {
+     for(int j = 0; j < hA.nonzerosInRow[i]; j++)
+     {
+       val[k] = hA.matrixValues[i][j];
+       k++;
+     }
+  }
+  clEnqueueWriteBuffer(command_queue, A.values, CL_TRUE, 0,
+                              A.num_nonzeros * sizeof( double ), val, 0, NULL, NULL );
+  clEnqueueWriteBuffer(command_queue, x.values, CL_TRUE, 0,
+                              x.num_values * sizeof( double ), hx.values, 0, NULL, NULL );
+ /* Call the spmv algorithm */
+  status = clsparseDcsrmv(&alpha, &A, &x, &beta, &y, createResult.control);
+
+  if (status != clsparseSuccess)
+  {
+      std::cerr << "Problem with execution SpMV algorithm."
+                << " Error: " << status << std::endl;
+  }
+  return 0;
+}
+
+int ComputeSPMV_apAp( const SparseMatrix & A, Vector & x, Vector & y) {
+  hpcg2clsparse_apAp(A, x, y);
+  return 0;
 }

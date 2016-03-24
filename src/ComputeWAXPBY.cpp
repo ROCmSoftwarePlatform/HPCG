@@ -90,3 +90,28 @@ int ComputeWAXPBY(const local_int_t n, const double h_alpha, const Vector & h_x,
                                                        
   return 0;
 }
+
+int ComputeWAXPBY_bApr(const local_int_t n, const double h_alpha, const Vector & h_x,
+    const double h_beta, const Vector & h_y, Vector & h_w, bool & isOptimized) {
+
+  static int count_axpby;
+  if (!count_axpby)
+  {
+    clsparseInitScalar(&d_beta);
+    d_beta.value =  ::clCreateBuffer (context, CL_MEM_READ_ONLY,
+                                      sizeof(double), NULL, &cl_status);
+    ++count_axpby;
+  }
+  clEnqueueWriteBuffer(command_queue, d_beta.value, CL_TRUE, 0,
+                              sizeof( double ), &h_beta, 0, NULL, NULL );
+  clEnqueueWriteBuffer(command_queue, x.values, CL_TRUE, 0,
+                              n * sizeof( double ), h_x.values, 0, NULL, NULL );
+  status = cldenseDaxpby(&y, &alpha, &x, &d_beta, &y, createResult.control);
+
+  if (status != clsparseSuccess)
+  {
+      std::cout << "Problem with execution of clsparse AXPBY algorithm"
+                << " error: [" << status << "]" << std::endl;
+  }
+  return 0;
+}
