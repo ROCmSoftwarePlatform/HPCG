@@ -50,12 +50,12 @@ namespace SYMGSKernel
       for (int j = 0; j < currentNumberOfNonzeros; j++)                                       \n\
       {                                                                                       \n\
         int curCol = mtxIndL[idx * 27 + j];                                                              \n\
-        sum -= matrixValues[idx * 27 + j];                                                  \n\
+        sum -= matrixValues[idx * 27 + j] * xv[curCol];                                                  \n\
       }                                                                                       \n\
                                                                                               \n\
-      sum += matrixDiagonal[idx];                                                \n\
+      sum += xv[idx + offset] * matrixDiagonal[idx];                                                \n\
                                                                                               \n\
-      xv[idx] = sum / matrixDiagonal[idx];                                                 \n\
+      xv[idx + offset] = sum / matrixDiagonal[idx];                                                 \n\
     }";
 
   void InitCLMem(int localNumberOfRows)
@@ -230,8 +230,8 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
   const double * const rv = r.values;
   double * const xv = x.values;
 
-  //SYMGSKernel::InitCLMem(nrow);
-  //SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
+  SYMGSKernel::InitCLMem(nrow);
+  SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
 
   // forward sweep to be carried out in parallel.
   local_int_t i = 0;
@@ -319,25 +319,25 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
       SYMGSKernel::clRv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                                    (max - i) * sizeof(double),
                                                    (void *)dlRv);
-      SYMGSKernel::clXv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
+      /*SYMGSKernel::clXv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
                                                    (max - i) * sizeof(double),
-                                                   (void *)dlXv);
+                                                   (void *)dlXv);*/
 
       SYMGSKernel::ExecuteKernel(max - i, i);
 
-      SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)dlXv,
+      /*SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)dlXv,
                               (max - i) * sizeof(double));
       for (int index = 0; index < (max - i); index++)
       {
         x.values[i + index] = dlXv[index];
-      }
+      }*/
 
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMatrixValues);
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMtxIndL);
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clNonzerosInRow);
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMatrixDiagonal);
       SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clRv);
-      SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clXv);
+      //SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clXv);
       //SYMGSKernel::ReleaseKernel(&SYMGSKernel::kernel);
       //SYMGSKernel::ReleaseProgram(&SYMGSKernel::program);
 
@@ -373,11 +373,14 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
 #endif
   }
 
-  for (int index = 0; index < nrow; index++)
+  SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values,
+                          nrow * sizeof(double));
+
+  /*for (int index = 0; index < nrow; index++)
   {
     std::cout << " " << xv[index];
   }
-  std::cout << std::endl;
+  std::cout << std::endl;*/
 
  // backward sweep to be computed in parallel.
  i = nrow - 1;
