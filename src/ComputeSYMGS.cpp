@@ -230,15 +230,15 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
   const double * const rv = r.values;
   double * const xv = x.values;
 
-  SYMGSKernel::InitCLMem(nrow);
-  SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
-
   // forward sweep to be carried out in parallel.
   local_int_t i = 0;
   int k;
+#if 0
+  SYMGSKernel::InitCLMem(nrow);
+  SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
+
   for(k = 1; k < (int)(A.counters.size() -1); k++)
   {
-#if 1
       //int max = (nrow < (A.counters[k] + 1)) ? (i < nrow ? nrow : i) : (i < (A.counters[k] + 1) ? (A.counters[k] + 1) : i);
       int max = 0;
       if (nrow < (A.counters[k] + 1))
@@ -349,8 +349,13 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
       delete [] cNonzerosInRow;
       delete [] dlRv;
       delete [] dlXv;
+  }
+  SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values,
+                          nrow * sizeof(double));
 #else
 
+  for(k = 1; k < (int)(A.counters.size() -1); k++)
+  {
   for (; i< nrow && (i <= A.counters[k]); i++) {
       const double * const currentValues = A.matrixValues[i];
       const local_int_t * const currentColIndices = A.mtxIndL[i];
@@ -360,23 +365,17 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
 
       for (int j=0; j< currentNumberOfNonzeros; j++) {
         local_int_t curCol = currentColIndices[j];
-        //sum -= currentValues[j] * xv[curCol];
-        sum -= currentValues[j];
+        sum -= currentValues[j] * xv[curCol];
       }
 
-      //sum += xv[i]*currentDiagonal; // Remove diagonal contribution from previous loop
-
-      sum += currentDiagonal;
-
+      sum += xv[i]*currentDiagonal; // Remove diagonal contribution from previous loop
       xv[i] = sum/currentDiagonal;
     }
-#endif
   }
+#endif
 
-  SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values,
-                          nrow * sizeof(double));
-
-  /*for (int index = 0; index < nrow; index++)
+/*
+  for (int index = 0; index < nrow; index++)
   {
     std::cout << " " << xv[index];
   }
