@@ -17,6 +17,8 @@
 
  HPCG routine
  */
+#include <stdio.h>
+#include <stdlib.h>
 #include "iostream"
 #include "ComputeSYMGS.hpp"
 #include "OptimizeProblem.hpp"
@@ -37,25 +39,6 @@ cl_program program = NULL;
 cl_kernel  kernel = NULL;
 
 const char *kernel_name = "forwardSYMGS";
-
-const char *forwardSYMGS_kernel = "                                                           \n\
-    __kernel void forwardSYMGS(__global double *matrixValues, __global int *mtxIndL,          \n\
-                               __global char *nonzerosInRow, __global double *matrixDiagonal, \n\
-                               __global double *rv, __global double *xv, int offset)          \n\
-    {                                                                                         \n\
-      int idx = get_global_id(0);                                                             \n\
-      int currentNumberOfNonzeros = nonzerosInRow[idx];                                       \n\
-      double sum = rv[idx];                                                                   \n\
-      for (int j = 0; j < currentNumberOfNonzeros; j++)                                       \n\
-      {                                                                                       \n\
-        int curCol = mtxIndL[idx * 27 + j];                                                   \n\
-        sum -= matrixValues[idx * 27 + j] * xv[curCol];                                       \n\
-      }                                                                                       \n\
-                                                                                              \n\
-      sum += xv[idx + offset] * matrixDiagonal[idx];                                          \n\
-                                                                                              \n\
-      xv[idx + offset] = sum / matrixDiagonal[idx];                                           \n\
-    }";
 
 void InitCLMem(int localNumberOfRows) {
   if (NULL == clXv) {
@@ -108,10 +91,29 @@ void ReadBuffer(cl_mem clBuf, void *pData, int size) {
 }
 
 void ExecuteKernel(int size, int offset) {
-  size_t sourceSize[] = { strlen(forwardSYMGS_kernel) };
+
+  // get size of kernel source
+  FILE* programHandle = fopen("..//..//src//kernel.cl", "r");
+  if (NULL == programHandle) {
+    std::cerr << "Can not open kernel file"<< std::endl;
+    return;
+  }
+  fseek(programHandle, 0, SEEK_END);
+  size_t programSize = ftell(programHandle);
+  rewind(programHandle);
+
+  // read kernel source into buffer
+  char *programBuffer  = (char*) malloc(programSize + 1);
+  programBuffer[programSize] = '\0';
+  fread(programBuffer, sizeof(char), programSize, programHandle);
+  fclose(programHandle);
+
   if (!program) {
-    program = clCreateProgramWithSource(hpcg_cl::getContext(), 1, &forwardSYMGS_kernel,
-                                        sourceSize, &cl_status);
+    // create program from buffer
+    program = clCreateProgramWithSource(hpcg_cl::getContext(), 1,
+            (const char**) &programBuffer, &programSize, &cl_status);
+    free(programBuffer);
+
     if (CL_SUCCESS != cl_status) {
       std::cout << "create program failed. status:" << cl_status << std::endl;
       return;
@@ -213,7 +215,7 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
   // forward sweep to be carried out in parallel.
   local_int_t i = 0;
   int k;
-#if 0
+#if 1
   SYMGSKernel::InitCLMem(nrow);
   SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
 
