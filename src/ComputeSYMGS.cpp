@@ -93,9 +93,9 @@ void ReadBuffer(cl_mem clBuf, void *pData, int size) {
 void ExecuteKernel(int size, int offset) {
 
   // get size of kernel source
-  FILE* programHandle = fopen("..//..//src//kernel.cl", "r");
+  FILE *programHandle = fopen("..//..//src//kernel.cl", "r");
   if (NULL == programHandle) {
-    std::cerr << "Can not open kernel file"<< std::endl;
+    std::cerr << "Can not open kernel file" << std::endl;
     return;
   }
   fseek(programHandle, 0, SEEK_END);
@@ -103,7 +103,7 @@ void ExecuteKernel(int size, int offset) {
   rewind(programHandle);
 
   // read kernel source into buffer
-  char *programBuffer  = (char*) malloc(programSize + 1);
+  char *programBuffer  = (char *) malloc(programSize + 1);
   programBuffer[programSize] = '\0';
   fread(programBuffer, sizeof(char), programSize, programHandle);
   fclose(programHandle);
@@ -111,7 +111,7 @@ void ExecuteKernel(int size, int offset) {
   if (!program) {
     // create program from buffer
     program = clCreateProgramWithSource(hpcg_cl::getContext(), 1,
-            (const char**) &programBuffer, &programSize, &cl_status);
+                                        (const char **) &programBuffer, &programSize, &cl_status);
     free(programBuffer);
 
     if (CL_SUCCESS != cl_status) {
@@ -199,6 +199,7 @@ void ReleaseKernel(cl_kernel *kernel) {
 
   @see ComputeSYMGS_ref
 */
+
 int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
 
   // This line and the next two lines should be removed and your version of ComputeSYMGS should be used.
@@ -221,28 +222,18 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
 
   for (k = 1; k < (int)(A.counters.size() - 1); k++) {
     //int max = (nrow < (A.counters[k] + 1)) ? (i < nrow ? nrow : i) : (i < (A.counters[k] + 1) ? (A.counters[k] + 1) : i);
-    int max = 0;
-    if (nrow < (A.counters[k] + 1)) {
-      if (i < nrow) {
-        max = nrow;
-      } else {
-        continue;
-      }
-    } else {
-      if (i < (A.counters[k] + 1)) {
-        max = A.counters[k] + 1;
-      } else {
-        continue;
-      }
+    if (!(i < nrow && i <= A.counters[k])) {
+      continue;
     }
+    int threadNum = std::min(nrow, A.counters[k] + 1) - i;
 
-    double *dlMatrixValues = new double[(max - i) * 27];
-    int  *iMtxIndL = new int[(max - i) * 27];
-    double *dlMatrixDiagonal = new double[(max - i)];
-    char *cNonzerosInRow = new char[(max - i)];
-    double *dlRv = new double[(max - i)];
-    double *dlXv = new double[(max - i)];
-    for (int index = 0; index < (max - i); index++) {
+    double *dlMatrixValues = new double[(threadNum) * 27];
+    int  *iMtxIndL = new int[(threadNum) * 27];
+    double *dlMatrixDiagonal = new double[(threadNum)];
+    char *cNonzerosInRow = new char[(threadNum)];
+    double *dlRv = new double[(threadNum)];
+    double *dlXv = new double[(threadNum)];
+    for (int index = 0; index < (threadNum); index++) {
       const double *const currentValues = A.matrixValues[i + index];
       const local_int_t *const currentColIndices = A.mtxIndL[i + index];
       dlMatrixDiagonal[index] = matrixDiagonal[i + index][0];
@@ -257,61 +248,36 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
 
     SYMGSKernel::clMatrixValues = SYMGSKernel::CreateCLBuf(
                                     CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                    (max - i) * 27 * sizeof(double),
+                                    (threadNum) * 27 * sizeof(double),
                                     (void *)dlMatrixValues);
 
     SYMGSKernel::clMtxIndL = SYMGSKernel::CreateCLBuf(
                                CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                               (max - i) * 27 * sizeof(int),
+                               (threadNum) * 27 * sizeof(int),
                                (void *)iMtxIndL);
-
-    /*SYMGSKernel::clNonzerosInRow = SYMGSKernel::CreateCLBuf(
-                              CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                              (max - i) * sizeof(char), (void *)(A.nonzerosInRow + i));
-
-    SYMGSKernel::clMatrixDiagonal = SYMGSKernel::CreateCLBuf(
-                              CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                              (max - i) * sizeof(double), (void *)dlMatrixDiagonal);
-
-    double *dlRv = r.values + i;
-    SYMGSKernel::clRv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                                 (max - i) * sizeof(double), (void *)dlRv);*/
 
     SYMGSKernel::clNonzerosInRow = SYMGSKernel::CreateCLBuf(
                                      CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                     (max - i) * sizeof(char),
+                                     (threadNum) * sizeof(char),
                                      (void *)cNonzerosInRow);
 
     SYMGSKernel::clMatrixDiagonal = SYMGSKernel::CreateCLBuf(
                                       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                      (max - i) * sizeof(double), (void *)dlMatrixDiagonal);
+                                      (threadNum) * sizeof(double), (void *)dlMatrixDiagonal);
 
     SYMGSKernel::clRv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                        (max - i) * sizeof(double),
+                        (threadNum) * sizeof(double),
                         (void *)dlRv);
-    /*SYMGSKernel::clXv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR,
-                                                 (max - i) * sizeof(double),
-                                                 (void *)dlXv);*/
 
-    SYMGSKernel::ExecuteKernel(max - i, i);
-
-    /*SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)dlXv,
-                            (max - i) * sizeof(double));
-    for (int index = 0; index < (max - i); index++)
-    {
-      x.values[i + index] = dlXv[index];
-    }*/
+    SYMGSKernel::ExecuteKernel(threadNum, i);
 
     SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMatrixValues);
     SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMtxIndL);
     SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clNonzerosInRow);
     SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMatrixDiagonal);
     SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clRv);
-    //SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clXv);
-    //SYMGSKernel::ReleaseKernel(&SYMGSKernel::kernel);
-    //SYMGSKernel::ReleaseProgram(&SYMGSKernel::program);
 
-    i += (max - i);
+    i += (threadNum);
 
     delete [] dlMatrixDiagonal;
     delete [] dlMatrixValues;
@@ -343,7 +309,7 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
   }
 #endif
 
-  /*
+ /* 
     for (int index = 0; index < nrow; index++)
     {
       std::cout << " " << xv[index];
