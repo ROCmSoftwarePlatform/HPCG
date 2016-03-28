@@ -27,6 +27,9 @@
 #include <vector>
 using namespace std;
 
+//#define __OCL__
+//#define __DEBUG__
+
 /*!
   Routine to one step of symmetrix Gauss-Seidel:
 
@@ -67,11 +70,11 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
   SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
 
   SYMGSKernel::BuildProgram();
-  for (k = 1; k < (int)(A.counters.size() - 1); k++) {
-    if (!(i < nrow && i <= A.counters[k])) {
+  for (k = 1; k < (int)(A.counters.size()); k++) {
+    if (!(i < nrow && i < A.counters[k])) {
       continue;
     }
-    int threadNum = std::min(nrow, A.counters[k] + 1) - i;
+    int threadNum = std::min(nrow, A.counters[k]) - i;
 
     double *dlMatrixValues = new double[(threadNum) * 27];
     int  *iMtxIndL = new int[(threadNum) * 27];
@@ -135,17 +138,16 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
   SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values,
                           nrow * sizeof(double));
 
-#if __DEBUG__
-    for (int index = 0; index < nrow; index++)
-    {
-      std::cout << " " << xv[index];
-    }
-    std::cout << std::endl;
+#ifdef __DEBUG__
+  for (int index = 0; index < nrow; index++) {
+    std::cout << " " << xv[index];
+  }
+  std::cout << std::endl;
 #endif
 
   // backward sweep to be computed in parallel.
   i = nrow - 1;
-  for (k = (int)(A.counters.size() - 1); k > 0; k--) {
+  for (k = (int)(A.counters.size()); k > 0; k--) {
     for (; i >= 0 && (i >= A.counters[(k - 1)]); i--) {
       const double *const currentValues = A.matrixValues[i];
       const local_int_t *const currentColIndices = A.mtxIndL[i];
@@ -173,8 +175,8 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
   // forward sweep to be carried out in parallel.
   local_int_t i = 0;
   int k;
-  for (k = 1; k < (int)(A.counters.size() - 1); k++) {
-    for (; i < nrow && (i <= A.counters[k]); i++) {
+  for (k = 1; k < (int)(A.counters.size()); k++) {
+    for (; i < nrow && (i < A.counters[k]); i++) {
       const double *const currentValues = A.matrixValues[i];
       const local_int_t *const currentColIndices = A.mtxIndL[i];
       const int currentNumberOfNonzeros = A.nonzerosInRow[i];
@@ -184,7 +186,7 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
       for (int j = 0; j < currentNumberOfNonzeros; j++) {
         local_int_t curCol = currentColIndices[j];
         sum -= currentValues[j] * xv[curCol];
-        //sum -= currentValues[j];
+//        sum -= currentValues[j];
       }
 
       sum += xv[i] * currentDiagonal; // Remove diagonal contribution from previous loop
@@ -192,17 +194,16 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
     }
   }
 
-#if __DEBUG__
-    for (int index = 0; index < nrow; index++)
-    {
-      std::cout << " " << xv[index];
-    }
-    std::cout << std::endl;
+#ifdef __DEBUG__
+  for (int index = 0; index < nrow; index++) {
+    std::cout << " " << xv[index];
+  }
+  std::cout << std::endl;
 #endif
 
   // backward sweep to be computed in parallel.
   i = nrow - 1;
-  for (k = (int)(A.counters.size() - 1); k > 0; k--) {
+  for (k = (int)(A.counters.size()); k > 0; k--) {
     for (; i >= 0 && (i >= A.counters[(k - 1)]); i--) {
       const double *const currentValues = A.matrixValues[i];
       const local_int_t *const currentColIndices = A.mtxIndL[i];
@@ -213,6 +214,7 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
       for (int j = 0; j < currentNumberOfNonzeros; j++) {
         local_int_t curCol = currentColIndices[j];
         sum -= currentValues[j] * xv[curCol];
+
       }
       sum += xv[i] * currentDiagonal; // Remove diagonal contribution from previous loop
 
@@ -220,6 +222,7 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
     }
   }
 }
+
 
 int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
 
@@ -230,9 +233,9 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
 #endif
 
 #ifdef __OCL__
-ComputeSYMGS_OCL(A, r, x);
+  ComputeSYMGS_OCL(A, r, x);
 #else
-ComputeSYMGS_CPU(A, r, x);
+  ComputeSYMGS_CPU(A, r, x);
 #endif
 
   return 0;

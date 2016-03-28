@@ -96,12 +96,12 @@ namespace hpcg_cl {
     assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
 
     cl_uint ret_num_of_devices = 0;
-    err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 0, NULL, &ret_num_of_devices);
+    err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_CPU, 0, NULL, &ret_num_of_devices);
 
     assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
 
     device = (cl_device_id*)malloc(ret_num_of_devices * sizeof(cl_device_id));
-    err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_GPU , ret_num_of_devices, device, 0);
+    err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_CPU , ret_num_of_devices, device, 0);
     assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
 
     cl_context_properties property[] = {CL_CONTEXT_PLATFORM,
@@ -357,7 +357,7 @@ namespace hpcg_cl {
 
   @param[inout] A      The known system matrix, also contains the MG hierarchy in attributes Ac and mgData.
   @param[inout] A_ref  The reference which needs to be reordered accordingly.
-  @param[inout] colors The vecotor to store the index of the reordering order.
+  @param[inout] colors The vecotor to store the index of the reordering order. 
 
   @return returns 0 upon success and non-zero otherwise
 
@@ -366,190 +366,165 @@ namespace hpcg_cl {
 */
 
 // free the reference matrix
-void free_refmatrix_m(SparseMatrix &A) {
-  for (int i = 0 ; i < A.localNumberOfRows; i++) {
+void free_refmatrix_m(SparseMatrix &A)
+{
+  for(int i =0 ; i < A.localNumberOfRows; i++)
+  {
     delete [] A.matrixValues[i];
     delete [] A.mtxIndL[i];
   }
 }
 
-// Hash fucntion
-
-int hash_function(int index , int nnz) {
-  int i;
-  unsigned int uiHash = 0U;
-  uiHash = (index * (unsigned int) row) + nnz;
-  return uiHash;
-}
-
-
-// Copy source to destination
-
-void copy_value(std::vector<local_int_t> &dest,  std::vector<local_int_t> &source) {
-  for (int i = 0; i < row; ++i) {
-    dest[i] = source[i];
-  }
-}
-
 // luby's graph coloring algorthim - nvidia's approach
 
-void lubys_graph_coloring(
-  int c,
-  int *row_offset,
-  int *col_index,
-  std::vector<local_int_t> &colors,
-  int *random,
-  std::vector<local_int_t> &temp) {
-
-  //copy_value(temp,colors);
-  std::copy(colors.begin(), colors.end(), temp.begin());
-  for (int i = 0; i < row; i++) {
-    int flag = 1;
-    if (temp[i] != -1) {
-      continue;
+void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<local_int_t> &colors,int *random,std::vector<local_int_t> &temp)
+{
+    for(int i=0;i<row;i++)
+    {
+       int flag = 1;
+       if(colors[i] != -1)
+          continue;
+       int ir = random[i];
+       for(int k=row_offset[i];k<row_offset[i+1];k++)
+       {
+          int j = col_index[k];
+          int jc = colors[j];
+          if (((jc != -1) && (jc != c)) || (i == j)) 
+            continue;
+          int jr = random[j];
+          if(ir <= jr)
+            flag = 0;
+       }
+       if(flag)
+       {
+        colors[i] = c;
+       }
+        
     }
-    int ir = random[i];
-    for (int k = row_offset[i]; k < row_offset[i + 1]; k++) {
-      int j = col_index[k];
-      int jc = colors[j];
-      if (((jc != -1) && (jc != c)) || (i == j)) {
-        continue;
-      }
-      int jr = random[j];
-      if (ir <= jr) {
-        flag = 0;
-      }
-    }
-    if (flag) {
-      temp[i] = c;
-    }
-  }
-  //copy_value(colors,temp);
-  std::copy(temp.begin(), temp.end(), colors.begin());
 }
 
 
-int OptimizeProblem(const SparseMatrix &A, SparseMatrix &A_ref) {
+int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
 
   const local_int_t nrow = A.localNumberOfRows;
   row = nrow;
   int *random = new int [nrow];
   std::vector<local_int_t> temp(nrow, -1);
-  int *row_offset, *col_index;
+  int *row_offset,*col_index;
   col_index = new int [nrow * 27];
   row_offset = new int [(nrow + 1)];
+
+ // Initialize local Color array and random array using rand functions.
+  srand(1459166450);
+  for (int i = 0; i < nrow; i++)
+  {
+      random[i] = rand(); 
+  }
   row_offset[0] = 0;
 
-  // Initialize local Color array and random array using hash functions.
+
+  int k = 0;
   // Save the mtxIndL in a single dimensional array for column index reference.
-  for (int k = 0, i = 0; i < nrow; i++) {
-    random[i] = (i * (unsigned int)row) + A.nonzerosInRow[i];
-    for (int j = 0; j < A.nonzerosInRow[i]; j++) {
-      col_index[k] = A.mtxIndL[i][j];
-      k++;
+  for(int i = 0; i < nrow; i++)
+  {
+    for(int j = 0; j < A.nonzerosInRow[i]; j++)
+    {
+        col_index[k] = A.mtxIndL[i][j];
+        k++;
     }
   }
-
+  
+ 
+  k = 0;
   // Calculate the row offset.
   int ridx = 1;
   int sum = 0;
-  for (int i = 0; i < nrow; i++) {
-    sum =  sum + A.nonzerosInRow[i];
-    row_offset[ridx] = sum;
-    ridx++;
+  for(int i = 0; i < nrow; i++)
+  {
+     sum =  sum + A.nonzerosInRow[i];
+     row_offset[ridx] = sum;
+     ridx++;
   }
 
   hpcg_cl::InitOpenCL();
 
-  hpcg_cl::InitCLMem(nrow, row_offset, col_index, random);
-
-  hpcg_cl::InitCpuMem(nrow * sizeof(int));
-
-  //std::cout << "size: " << nrow << std::endl;
-
-  hpcg_cl::WriteBuffer(A_ref.colors, hpcg_cl::clColors);
-  hpcg_cl::WriteBuffer(A_ref.colors, hpcg_cl::clTemp);
-  cl_mem clColors;
-  cl_mem clTemp;
-
-  // Call luby's graph coloring algorithm.
+  // Call luby's graph coloring algorithm. 
   int c = 0;
-  for (c = 0; c < nrow; c++) {
-      //lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
-      if (c % 2 == 0)
-      {
-        clColors = hpcg_cl::clColors;
-        clTemp = hpcg_cl::clTemp;
-      }
-      else
-      {
-        clColors = hpcg_cl::clTemp;
-        clTemp = hpcg_cl::clColors;
-      }
-      hpcg_cl::ExecuteKernel(c, nrow, clColors, clTemp);
+  for( c = 0; c < nrow; c++)
+  {
 
-      hpcg_cl::ReadBuffer(A_ref.colors, clTemp);
-      //std::cout << "c : " << c << std::endl;
+      lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
       int left = std::count(A_ref.colors.begin(), A_ref.colors.end(), -1);
         if(left == 0)
           break;
   }
-
-  hpcg_cl::ReleaseCLMem();
-
-  hpcg_cl::ReleaseCpuMem((void **)&hpcg_cl::colors);
-
   // Calculate number of rows with the same color and save it in counter vector.
-  std::vector<local_int_t> counters(c + 1);
-  A_ref.counters.resize(c + 1);
+  std::vector<local_int_t> counters(c+2);
+  A_ref.counters.resize(c+2);
   std::fill(counters.begin(), counters.end(), 0);
-  for (local_int_t i = 0; i < nrow; ++i) {
+  for (local_int_t i = 0; i < nrow; ++i)
+  {
     counters[A_ref.colors[i]]++;
   }
 
-  // Calculate color offset using counter vector.
+  // Calculate color offset using counter vector. 
   local_int_t old = 0 , old0 = 0;
-  for (int i = 1; i <= c; ++i) {
+  for (int i = 1; i <= c + 1; ++i) {
     old0 = counters[i];
-    counters[i] = counters[i - 1] + old;
+    counters[i] = counters[i-1] + old;
     old = old0;
   }
   counters[0] = 0;
 
 
-  for (int i = 0; i <= c; ++i) {
+  for (int i = 0; i <= c + 1; ++i) {
     A_ref.counters[i] = counters[i];
   }
-
+  
   // translate `colors' into a permutation.
-  for (local_int_t i = 0; i < nrow; ++i) { // for each color `c'
-    A_ref.colors[i] = counters[A_ref.colors[i]]++;
+  std::vector<local_int_t> colors(nrow);
+  int k1 = 0;
+  for(int i = 0; i < c+1; i++)
+  {
+      for(int j = 0; j < nrow; j++)
+      {
+          if(A_ref.colors[j] == i)
+          {
+              colors[k1] = j;
+              k1++;
+          }
+      }
   }
+  for(int i = 0; i < nrow; i++)
+    A_ref.colors[i] = colors[i];
 
   // Rearranges the reference matrix according to the coloring index.
-  for (int i = 0; i < nrow; i++) {
+for(int i = 0; i < nrow; i++)
+  {   
+	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
+     A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
+	   const double * const currentValues = A.matrixValues[A_ref.colors[i]];
+	   const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
 
-    const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
-    A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
-    const double *const currentValues = A.matrixValues[A_ref.colors[i]];
-    const local_int_t *const currentColIndices = A.mtxIndL[A_ref.colors[i]];
-
-    double *diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
-    A_ref.matrixDiagonal[i] = diagonalValue;
-
-    //rearrange the elements in the row
-    int col_indx = 0;
-    for (int k = 0; k < nrow; k++) {
-      for (int j = 0; j < currentNumberOfNonzeros; j++) {
-        if (A_ref.colors[k] == currentColIndices[j]) {
-          A_ref.matrixValues[i][col_indx] = currentValues[j];
-          A_ref.mtxIndL[i][col_indx++] = k;
-          break;
+	   double * diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
+	   A_ref.matrixDiagonal[i] = diagonalValue;
+  
+		//rearrange the elements in the row
+     int col_indx = 0;
+     for(int k = 0; k < nrow; k++)
+     {
+	      for(int j = 0; j < currentNumberOfNonzeros; j++)
+	      {		
+		       if(A_ref.colors[k] == currentColIndices[j])
+		       {
+			        A_ref.matrixValues[i][col_indx] = currentValues[j];
+			        A_ref.mtxIndL[i][col_indx++] = k;
+			        break;
+   	       }	
         }
-      }
-    }
+     }
   }
-
+ 
   delete [] row_offset;
   delete [] col_index;
   delete [] random;
@@ -558,6 +533,8 @@ int OptimizeProblem(const SparseMatrix &A, SparseMatrix &A_ref) {
 }
 
 // Helper function (see OptimizeProblem.hpp for details)
-double OptimizeProblemMemoryUse(const SparseMatrix &A) {
+double OptimizeProblemMemoryUse(const SparseMatrix & A) {
+
   return 0.0;
+
 }
