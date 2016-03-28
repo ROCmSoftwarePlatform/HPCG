@@ -54,14 +54,7 @@ using namespace std;
   @see ComputeSYMGS_ref
 */
 
-int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
-
-  // This line and the next two lines should be removed and your version of ComputeSYMGS should be used.
-  assert(x.localLength == A.localNumberOfColumns); // Make sure x contain space for halo values
-
-#ifndef HPCG_NO_MPI
-  ExchangeHalo(A, x);
-#endif
+static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) {
   const local_int_t nrow = A.localNumberOfRows;
   double **matrixDiagonal = A.matrixDiagonal;   // An array of pointers to the diagonal entries A.matrixValues
   const double *const rv = r.values;
@@ -70,13 +63,11 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
   // forward sweep to be carried out in parallel.
   local_int_t i = 0;
   int k;
-#if 1
   SYMGSKernel::InitCLMem(nrow);
   SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
 
   SYMGSKernel::BuildProgram();
   for (k = 1; k < (int)(A.counters.size() - 1); k++) {
-    //int max = (nrow < (A.counters[k] + 1)) ? (i < nrow ? nrow : i) : (i < (A.counters[k] + 1) ? (A.counters[k] + 1) : i);
     if (!(i < nrow && i <= A.counters[k])) {
       continue;
     }
@@ -143,29 +134,8 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
   }
   SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values,
                           nrow * sizeof(double));
-#else
 
-  for (k = 1; k < (int)(A.counters.size() - 1); k++) {
-    for (; i < nrow && (i <= A.counters[k]); i++) {
-      const double *const currentValues = A.matrixValues[i];
-      const local_int_t *const currentColIndices = A.mtxIndL[i];
-      const int currentNumberOfNonzeros = A.nonzerosInRow[i];
-      const double  currentDiagonal = matrixDiagonal[i][0]; // Current diagonal value
-      double sum = rv[i]; // RHS value
-
-      for (int j = 0; j < currentNumberOfNonzeros; j++) {
-        local_int_t curCol = currentColIndices[j];
-        sum -= currentValues[j] * xv[curCol];
-        //sum -= currentValues[j];
-      }
-
-      sum += xv[i] * currentDiagonal; // Remove diagonal contribution from previous loop
-      xv[i] = sum / currentDiagonal;
-    }
-  }
-#endif
-
-#if 0
+#if __DEBUG__
     for (int index = 0; index < nrow; index++)
     {
       std::cout << " " << xv[index];
@@ -192,5 +162,78 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
       xv[i] = sum / currentDiagonal;
     }
   }
+}
+
+static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) {
+  const local_int_t nrow = A.localNumberOfRows;
+  double **matrixDiagonal = A.matrixDiagonal;   // An array of pointers to the diagonal entries A.matrixValues
+  const double *const rv = r.values;
+  double *const xv = x.values;
+
+  // forward sweep to be carried out in parallel.
+  local_int_t i = 0;
+  int k;
+  for (k = 1; k < (int)(A.counters.size() - 1); k++) {
+    for (; i < nrow && (i <= A.counters[k]); i++) {
+      const double *const currentValues = A.matrixValues[i];
+      const local_int_t *const currentColIndices = A.mtxIndL[i];
+      const int currentNumberOfNonzeros = A.nonzerosInRow[i];
+      const double  currentDiagonal = matrixDiagonal[i][0]; // Current diagonal value
+      double sum = rv[i]; // RHS value
+
+      for (int j = 0; j < currentNumberOfNonzeros; j++) {
+        local_int_t curCol = currentColIndices[j];
+        sum -= currentValues[j] * xv[curCol];
+        //sum -= currentValues[j];
+      }
+
+      sum += xv[i] * currentDiagonal; // Remove diagonal contribution from previous loop
+      xv[i] = sum / currentDiagonal;
+    }
+  }
+
+#if __DEBUG__
+    for (int index = 0; index < nrow; index++)
+    {
+      std::cout << " " << xv[index];
+    }
+    std::cout << std::endl;
+#endif
+
+  // backward sweep to be computed in parallel.
+  i = nrow - 1;
+  for (k = (int)(A.counters.size() - 1); k > 0; k--) {
+    for (; i >= 0 && (i >= A.counters[(k - 1)]); i--) {
+      const double *const currentValues = A.matrixValues[i];
+      const local_int_t *const currentColIndices = A.mtxIndL[i];
+      const int currentNumberOfNonzeros = A.nonzerosInRow[i];
+      const double  currentDiagonal = matrixDiagonal[i][0]; // Current diagonal value
+      double sum = rv[i]; // RHS value
+
+      for (int j = 0; j < currentNumberOfNonzeros; j++) {
+        local_int_t curCol = currentColIndices[j];
+        sum -= currentValues[j] * xv[curCol];
+      }
+      sum += xv[i] * currentDiagonal; // Remove diagonal contribution from previous loop
+
+      xv[i] = sum / currentDiagonal;
+    }
+  }
+}
+
+int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
+
+  // This line and the next two lines should be removed and your version of ComputeSYMGS should be used.
+  assert(x.localLength == A.localNumberOfColumns); // Make sure x contain space for halo values
+#ifndef HPCG_NO_MPI
+  ExchangeHalo(A, x);
+#endif
+
+#ifdef __OCL__
+ComputeSYMGS_OCL(A, r, x);
+#else
+ComputeSYMGS_CPU(A, r, x);
+#endif
+
   return 0;
 }
