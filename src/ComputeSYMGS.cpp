@@ -27,7 +27,7 @@
 #include <vector>
 using namespace std;
 
-//#define __OCL__
+#define __OCL__
 //#define __DEBUG__
 
 /*!

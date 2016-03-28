@@ -96,12 +96,12 @@ namespace hpcg_cl {
     assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
 
     cl_uint ret_num_of_devices = 0;
-    err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_CPU, 0, NULL, &ret_num_of_devices);
+    err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 0, NULL, &ret_num_of_devices);
 
     assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
 
     device = (cl_device_id*)malloc(ret_num_of_devices * sizeof(cl_device_id));
-    err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_CPU , ret_num_of_devices, device, 0);
+    err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_GPU , ret_num_of_devices, device, 0);
     assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
 
     cl_context_properties property[] = {CL_CONTEXT_PLATFORM,
