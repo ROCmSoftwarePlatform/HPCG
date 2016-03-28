@@ -64,9 +64,9 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
   // forward sweep to be carried out in parallel.
   local_int_t i = 0;
   int k;
-  for(k = 1; k < (int)(A.counters.size() -1); k++)
+  for(k = 1; k < (int)(A.counters.size()); k++)
   {
-      for (; i< nrow && (i <= A.counters[k]); i++) {
+      for (; i< nrow && (i < A.counters[k]); i++) {
       const double * const currentValues = A.matrixValues[i];
       const local_int_t * const currentColIndices = A.mtxIndL[i];
       const int currentNumberOfNonzeros = A.nonzerosInRow[i];
@@ -86,7 +86,7 @@ assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for 
   
  // backward sweep to be computed in parallel.
  i = nrow - 1;
- for(k = (int)(A.counters.size() - 1); k > 0; k--)
+ for(k = (int)(A.counters.size()); k > 0; k--)
  {
   for ( ; i >= 0 && (i >= A.counters[(k - 1)]); i--) {
     const double * const currentValues = A.matrixValues[i];

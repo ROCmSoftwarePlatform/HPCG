@@ -83,7 +83,6 @@ int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, V
   r_copy.values = new double[A.localNumberOfRows];
 
   ZeroVector(x); 
-
   int ierr = 0;
   if (A.mgData!=0) { // Go to next coarse level if defined
 
