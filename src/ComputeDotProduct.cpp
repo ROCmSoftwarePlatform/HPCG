@@ -76,3 +76,16 @@ int ComputeDotProduct(const local_int_t n, const Vector & h_x, const Vector & h_
                               
   return 0;                                                                       
 }
+
+int ComputeDotProduct_rr(double & result) {
+  status = cldenseDdot(&d_beta, &y, &y, createResult.control);
+
+  if (status != clsparseSuccess)
+  {
+      std::cout << "Problem with execution of clsparse DOT algorithm"
+                << " error: [" << status << "]" << std::endl;
+  }
+  clEnqueueReadBuffer(command_queue, d_beta.value, CL_TRUE, 0,
+                      sizeof(double), &result, 0, NULL, NULL );
+  return 0;
+}
