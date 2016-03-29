@@ -108,13 +108,11 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
     int threadNum = std::min(nrow, A.counters[k]) - i;
 
     for (int index = 0; index < (threadNum); index++) {
-      const double *const currentValues = A.matrixValues[i + index];
-      const local_int_t *const currentColIndices = A.mtxIndL[i + index];
-      dlMatrixDiagonal[index] = matrixDiagonal[i + index][0];
       for (int m = 0; m < 27; m++) {
-        dlMatrixValues[index * 27 + m] = currentValues[m];
-        iMtxIndL[index * 27 + m] = currentColIndices[m];
+        dlMatrixValues[index * 27 + m] = A.matrixValues[i + index][m];
+        iMtxIndL[index * 27 + m] = A.mtxIndL[i + index][m];
       }
+      dlMatrixDiagonal[index] = matrixDiagonal[i + index][0];
       cNonzerosInRow[index] = A.nonzerosInRow[i + index];
       dlRv[index] = r.values[i + index];
     }
@@ -141,13 +139,11 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
     int ii = i - threadNum + 1;
 
     for (int index = 0; index < (threadNum); index++) {
-      const double *const currentValues = A.matrixValues[ii + index];
-      const local_int_t *const currentColIndices = A.mtxIndL[ii + index];
-      dlMatrixDiagonal[index] = matrixDiagonal[ii + index][0];
       for (int m = 0; m < 27; m++) {
-        dlMatrixValues[index * 27 + m] = currentValues[m];
-        iMtxIndL[index * 27 + m] = currentColIndices[m];
+        dlMatrixValues[index * 27 + m] = A.matrixValues[ii + index][m];
+        iMtxIndL[index * 27 + m] = A.mtxIndL[ii + index][m];
       }
+      dlMatrixDiagonal[index] = matrixDiagonal[ii + index][0];
       cNonzerosInRow[index] = A.nonzerosInRow[ii + index];
       dlRv[index] = r.values[ii + index];
     }
