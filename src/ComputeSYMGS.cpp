@@ -68,8 +68,11 @@ int ComputeSYMGS( const SparseMatrix & A, const Vector & r, Vector & x) {
 
   // implemented level scheduling algorithm for forward sweep
   int level = 0;
-  while(level <= A.level_no)
+  for(level = 0; level <= A.level_no; level++)
   {
+    #ifndef HPCG_NO_OPENMP
+      #pragma omp parallel for
+    #endif
     for (local_int_t i=0; i< nrow; i++) {
       if(A.level_array[i] == level)
       {
@@ -88,13 +91,14 @@ int ComputeSYMGS( const SparseMatrix & A, const Vector & r, Vector & x) {
           xv[i] = sum/currentDiagonal;
       }
     }
-    level++;
   }
 
   // implemented level scheduling algorithm for backward sweep.
-  level = A.level_no;
-  while(level >= 0)
+  for(level = A.level_no; level >= 0; level--)
   {
+    #ifndef HPCG_NO_OPENMP
+      #pragma omp parallel for
+    #endif
     for (local_int_t i=nrow-1; i>=0; i--) {
       if(A.level_array[i] == level)
       {
@@ -113,7 +117,6 @@ int ComputeSYMGS( const SparseMatrix & A, const Vector & r, Vector & x) {
         xv[i] = sum/currentDiagonal;
       }
     }
-    level--;
   }
 
   return 0;
