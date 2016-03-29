@@ -81,7 +81,6 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
     double *dlMatrixDiagonal = new double[(threadNum)];
     char *cNonzerosInRow = new char[(threadNum)];
     double *dlRv = new double[(threadNum)];
-    double *dlXv = new double[(threadNum)];
     for (int index = 0; index < (threadNum); index++) {
       const double *const currentValues = A.matrixValues[i + index];
       const local_int_t *const currentColIndices = A.mtxIndL[i + index];
@@ -92,7 +91,6 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
       }
       cNonzerosInRow[index] = A.nonzerosInRow[i + index];
       dlRv[index] = r.values[i + index];
-      dlXv[index] = x.values[i + index];
     }
 
     SYMGSKernel::clMatrixValues = SYMGSKernel::CreateCLBuf(
@@ -133,8 +131,74 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
     delete [] iMtxIndL;
     delete [] cNonzerosInRow;
     delete [] dlRv;
-    delete [] dlXv;
   }
+  // backward sweep to be computed in parallel.
+  i = nrow - 1;
+  for (k = (int)(A.counters.size()); k > 0; k--) {
+    if (!(i >= 0 && i >= A.counters[(k - 1)])) {
+      continue;
+    }
+    int threadNum = i - std::max(0, A.counters[k-1]) + 1;
+
+    int ii = i - threadNum + 1;
+
+    double *dlMatrixValues = new double[(threadNum) * 27];
+    int  *iMtxIndL = new int[(threadNum) * 27];
+    double *dlMatrixDiagonal = new double[(threadNum)];
+    char *cNonzerosInRow = new char[(threadNum)];
+    double *dlRv = new double[(threadNum)];
+    for (int index = 0; index < (threadNum); index++) {
+      const double *const currentValues = A.matrixValues[ii + index];
+      const local_int_t *const currentColIndices = A.mtxIndL[ii + index];
+      dlMatrixDiagonal[index] = matrixDiagonal[ii + index][0];
+      for (int m = 0; m < 27; m++) {
+        dlMatrixValues[index * 27 + m] = currentValues[m];
+        iMtxIndL[index * 27 + m] = currentColIndices[m];
+      }
+      cNonzerosInRow[index] = A.nonzerosInRow[ii + index];
+      dlRv[index] = r.values[ii + index];
+    }
+
+    SYMGSKernel::clMatrixValues = SYMGSKernel::CreateCLBuf(
+                                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                    (threadNum) * 27 * sizeof(double),
+                                    (void *)dlMatrixValues);
+
+    SYMGSKernel::clMtxIndL = SYMGSKernel::CreateCLBuf(
+                               CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                               (threadNum) * 27 * sizeof(int),
+                               (void *)iMtxIndL);
+
+    SYMGSKernel::clNonzerosInRow = SYMGSKernel::CreateCLBuf(
+                                     CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                     (threadNum) * sizeof(char),
+                                     (void *)cNonzerosInRow);
+
+    SYMGSKernel::clMatrixDiagonal = SYMGSKernel::CreateCLBuf(
+                                      CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                      (threadNum) * sizeof(double), (void *)dlMatrixDiagonal);
+
+    SYMGSKernel::clRv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                        (threadNum) * sizeof(double),
+                        (void *)dlRv);
+
+    SYMGSKernel::ExecuteKernel(threadNum, ii);
+
+    SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMatrixValues);
+    SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMtxIndL);
+    SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clNonzerosInRow);
+    SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMatrixDiagonal);
+    SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clRv);
+
+    i -= (threadNum);
+
+    delete [] dlMatrixDiagonal;
+    delete [] dlMatrixValues;
+    delete [] iMtxIndL;
+    delete [] cNonzerosInRow;
+    delete [] dlRv;
+  }
+
   SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values,
                           nrow * sizeof(double));
 
@@ -145,25 +209,6 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
   std::cout << std::endl;
 #endif
 
-  // backward sweep to be computed in parallel.
-  i = nrow - 1;
-  for (k = (int)(A.counters.size()); k > 0; k--) {
-    for (; i >= 0 && (i >= A.counters[(k - 1)]); i--) {
-      const double *const currentValues = A.matrixValues[i];
-      const local_int_t *const currentColIndices = A.mtxIndL[i];
-      const int currentNumberOfNonzeros = A.nonzerosInRow[i];
-      const double  currentDiagonal = matrixDiagonal[i][0]; // Current diagonal value
-      double sum = rv[i]; // RHS value
-
-      for (int j = 0; j < currentNumberOfNonzeros; j++) {
-        local_int_t curCol = currentColIndices[j];
-        sum -= currentValues[j] * xv[curCol];
-      }
-      sum += xv[i] * currentDiagonal; // Remove diagonal contribution from previous loop
-
-      xv[i] = sum / currentDiagonal;
-    }
-  }
 }
 
 static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) {
