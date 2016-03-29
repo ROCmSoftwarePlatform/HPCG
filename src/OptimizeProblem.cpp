@@ -45,12 +45,11 @@ namespace hpcg_cl {
   const char *kernel_name = "lubys_graph";
   const char *Lubys_graph_kernel = "                                                    \n\
     __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_index, \n\
-                              __global int *Colors, __global int *random,               \n\
-                              __global int *temp)                                       \n\
+                              __global int *Colors, __global int *random)               \n\
     {                                                                                   \n\
       int x = get_global_id(0);                                                         \n\
       int flag = 1;                                                                     \n\
-      if(temp[x] == -1)                                                                 \n\
+      if(Colors[x] == -1)                                                               \n\
       {                                                                                 \n\
         int ir = random[x];                                                             \n\
         for(int k = row_offset[x]; k < row_offset[x + 1]; k++)                          \n\
@@ -69,7 +68,7 @@ namespace hpcg_cl {
         }                                                                               \n\
         if(flag)                                                                        \n\
         {                                                                               \n\
-          temp[x] = c;                                                                  \n\
+          Colors[x] = c;                                                                \n\
         }                                                                               \n\
       }                                                                                 \n\
     }                                                                                   \n\
@@ -294,7 +293,7 @@ namespace hpcg_cl {
     return device[0];
   }
 
-  void ExecuteKernel(int c, int row_size, cl_mem clMemColors, cl_mem clMemTemp)
+  void ExecuteKernel(int c, int row_size, cl_mem clMemColors)
   {
     size_t sourceSize[] = { strlen(Lubys_graph_kernel) };
     if (!program)
@@ -334,7 +333,6 @@ namespace hpcg_cl {
     clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&clCol_index);
     clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&clMemColors);
     clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&clRandom);
-    clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&clMemTemp);
 
     size_t global_size[] = {row_size};
     cl_status = clEnqueueNDRangeKernel(command_queue, kernel, 1, NULL,
@@ -357,7 +355,7 @@ namespace hpcg_cl {
 
   @param[inout] A      The known system matrix, also contains the MG hierarchy in attributes Ac and mgData.
   @param[inout] A_ref  The reference which needs to be reordered accordingly.
-  @param[inout] colors The vecotor to store the index of the reordering order. 
+  @param[inout] colors The vecotor to store the index of the reordering order.
 
   @return returns 0 upon success and non-zero otherwise
 
@@ -389,7 +387,7 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<loc
        {
           int j = col_index[k];
           int jc = colors[j];
-          if (((jc != -1) && (jc != c)) || (i == j)) 
+          if (((jc != -1) && (jc != c)) || (i == j))
             continue;
           int jr = random[j];
           if(ir <= jr)
@@ -399,7 +397,7 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<loc
        {
         colors[i] = c;
        }
-        
+
     }
 }
 
@@ -418,7 +416,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   srand(1459166450);
   for (int i = 0; i < nrow; i++)
   {
-      random[i] = rand(); 
+      random[i] = rand();
   }
   row_offset[0] = 0;
 
@@ -433,8 +431,8 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
         k++;
     }
   }
-  
- 
+
+
   k = 0;
   // Calculate the row offset.
   int ridx = 1;
@@ -448,16 +446,38 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
 
   hpcg_cl::InitOpenCL();
 
-  // Call luby's graph coloring algorithm. 
+  hpcg_cl::InitCLMem(nrow, row_offset, col_index, random);
+
+  hpcg_cl::InitCpuMem(nrow * sizeof(int));
+
+  //std::cout << "size: " << nrow << std::endl;
+
+  hpcg_cl::WriteBuffer(A_ref.colors, hpcg_cl::clColors);
+  //hpcg_cl::WriteBuffer(A_ref.colors, hpcg_cl::clTemp);
+  //cl_mem clColors;
+  //cl_mem clTemp;
+
+  // Call luby's graph coloring algorithm.
   int c = 0;
   for( c = 0; c < nrow; c++)
   {
+      hpcg_cl::ExecuteKernel(c, nrow, hpcg_cl::clColors);
 
-      lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
+      hpcg_cl::ReadBuffer(A_ref.colors, hpcg_cl::clColors);
+
+      //lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
       int left = std::count(A_ref.colors.begin(), A_ref.colors.end(), -1);
         if(left == 0)
           break;
   }
+
+  hpcg_cl::ReleaseCLMem();
+
+  hpcg_cl::ReleaseCpuMem((void **)&hpcg_cl::colors);
+
+  /*std::cout << "total " << nrow
+            << " cycle " << c << std::endl;*/
+
   // Calculate number of rows with the same color and save it in counter vector.
   std::vector<local_int_t> counters(c+2);
   A_ref.counters.resize(c+2);
@@ -467,7 +487,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
     counters[A_ref.colors[i]]++;
   }
 
-  // Calculate color offset using counter vector. 
+  // Calculate color offset using counter vector.
   local_int_t old = 0 , old0 = 0;
   for (int i = 1; i <= c + 1; ++i) {
     old0 = counters[i];
@@ -480,7 +500,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   for (int i = 0; i <= c + 1; ++i) {
     A_ref.counters[i] = counters[i];
   }
-  
+
   // translate `colors' into a permutation.
   std::vector<local_int_t> colors(nrow);
   int k1 = 0;
@@ -500,7 +520,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
 
   // Rearranges the reference matrix according to the coloring index.
 for(int i = 0; i < nrow; i++)
-  {   
+  {
 	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
      A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
 	   const double * const currentValues = A.matrixValues[A_ref.colors[i]];
@@ -508,23 +528,23 @@ for(int i = 0; i < nrow; i++)
 
 	   double * diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
 	   A_ref.matrixDiagonal[i] = diagonalValue;
-  
+
 		//rearrange the elements in the row
      int col_indx = 0;
      for(int k = 0; k < nrow; k++)
      {
 	      for(int j = 0; j < currentNumberOfNonzeros; j++)
-	      {		
+	      {
 		       if(A_ref.colors[k] == currentColIndices[j])
 		       {
 			        A_ref.matrixValues[i][col_indx] = currentValues[j];
 			        A_ref.mtxIndL[i][col_indx++] = k;
 			        break;
-   	       }	
+   	       }
         }
      }
   }
- 
+
   delete [] row_offset;
   delete [] col_index;
   delete [] random;
