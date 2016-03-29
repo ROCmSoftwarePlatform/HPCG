@@ -22,13 +22,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <iostream>
-#include <CL/cl.hpp>
-
-namespace hpcg_cl {
-  cl_command_queue getCommandQueue(void);
-  cl_context getContext(void);
-  cl_device_id getDeviceId(void);
-}
 
 int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref);
 void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<local_int_t> &colors,int *random, std::vector<local_int_t> &temp);

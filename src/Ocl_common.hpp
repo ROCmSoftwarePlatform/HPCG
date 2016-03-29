@@ -1,4 +1,8 @@
 
+#ifndef OCLCOMMON_HPP
+#define OCLCOMMON_HPP
+
+#include "OCL.hpp"
 namespace SYMGSKernel {
 cl_mem  clMatrixValues = NULL;
 cl_mem  clMtxIndL = NULL;
@@ -146,5 +150,5 @@ void ReleaseKernel(cl_kernel *kernel) {
   return;
 }
 }
-
+#endif
 
