@@ -34,7 +34,6 @@
 #include "ComputeWAXPBY.hpp"
 #include "OptimizeProblem.hpp"
 
-
 // Use TICK and TOCK to time a code section in MATLAB-like fashion
 #define TICK()  t0 = mytimer() //!< record current time in 't0'
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
@@ -87,9 +86,9 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
 #endif
   // p is of length ncols, copy x to p for sparse MV operation
   CopyVector(x, p);
-  TICK(); ComputeSPMV(A, p, Ap); TOCK(t3); // Ap = A*p
-  TICK(); ComputeWAXPBY(nrow, 1.0, b, -1.0, Ap, r, A.isWaxpbyOptimized);  TOCK(t2); // r = b - Ax (x stored in p)
-  TICK(); ComputeDotProduct(nrow, r, r, normr, t4, A.isDotProductOptimized); TOCK(t1);
+  TICK(); ComputeSPMV_apAp(A, p, Ap); TOCK(t3); // Ap = A*p
+  TICK(); ComputeWAXPBY_bApr(nrow, b, -1.0);  TOCK(t2); // r = b - Ax (x stored in p)
+  TICK(); ComputeDotProduct_rr(normr); TOCK(t1);
   normr = sqrt(normr);
 #ifdef HPCG_DEBUG
   if (A.geom->rank==0) HPCG_fout << "Initial Residual = "<< normr << std::endl;
