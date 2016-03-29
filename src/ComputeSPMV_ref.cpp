@@ -19,6 +19,8 @@
  */
 
 #include "ComputeSPMV_ref.hpp"
+#include <iostream>
+#include "ComputeSPMV.hpp"
 
 #ifndef HPCG_NO_MPI
 #include "ExchangeHalo.hpp"
@@ -27,7 +29,12 @@
 #ifndef HPCG_NO_OPENMP
 #include <omp.h>
 #endif
+#include <vector>
 #include <cassert>
+#include <fstream>
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
 
 /*!
   Routine to compute matrix vector product y = Ax where:
@@ -45,13 +52,13 @@
   @see ComputeSPMV
 */
 int ComputeSPMV_ref( const SparseMatrix & A, Vector & x, Vector & y) {
-
   assert(x.localLength>=A.localNumberOfColumns); // Test vector lengths
   assert(y.localLength>=A.localNumberOfRows);
 
 #ifndef HPCG_NO_MPI
     ExchangeHalo(A,x);
 #endif
+
   const double * const xv = x.values;
   double * const yv = y.values;
   const local_int_t nrow = A.localNumberOfRows;
@@ -68,5 +75,6 @@ int ComputeSPMV_ref( const SparseMatrix & A, Vector & x, Vector & y) {
       sum += cur_vals[j]*xv[cur_inds[j]];
     yv[i] = sum;
   }
+   
   return 0;
 }
