@@ -11,7 +11,7 @@ cl_int  cl_status = CL_SUCCESS;
 cl_program program = NULL;
 cl_kernel  kernel = NULL;
 
-const char *kernel_name = "forwardSYMGS";
+const char *kernel_name = "SYMGS";
 
 void InitCLMem(int localNumberOfRows) {
   if (NULL == clXv) {

@@ -1,4 +1,4 @@
-__kernel void forwardSYMGS(__global double *matrixValues, __global int *mtxIndL,
+__kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
                            __global char *nonzerosInRow, __global double *matrixDiagonal,
                            __global double *rv, __global double *xv, int offset) {
   int idx = get_global_id(0);
