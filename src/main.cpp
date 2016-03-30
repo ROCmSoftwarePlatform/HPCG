@@ -70,12 +70,14 @@ extern cl_command_queue command_queue;
 extern cl_int cl_status;
 extern clsparseCreateResult createResult;
 extern clsparseStatus status;
-extern clsparseScalar alpha;
-extern clsparseScalar beta;
-extern clsparseCsrMatrix A;
-extern cldenseVector x;
-extern cldenseVector y;
-extern clsparseScalar d_beta;
+
+extern cl_program program;              
+extern cl_kernel kernel1, kernel2, kernel3;   
+
+extern clsparseCsrMatrix d_A;
+extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
+extern clsparseScalar d_alpha, d_beta, d_normr, d_minus; 
+extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
 
 extern double *val;
 extern int *col, *rowoff;
@@ -408,15 +410,32 @@ int main(int argc, char * argv[]) {
                 << " Error: " << status << std::endl;
   }
 
-  clsparseCsrMetaDelete( &::A );
-  clReleaseMemObject ( alpha.value );
-  clReleaseMemObject ( beta.value );
+  clsparseCsrMetaDelete( &d_A );
+  clReleaseMemObject ( d_alpha.value );
   clReleaseMemObject ( d_beta.value );
-  clReleaseMemObject ( ::A.col_indices );
-  clReleaseMemObject ( ::A.row_pointer );
-  clReleaseMemObject ( ::A.values );
-  clReleaseMemObject ( ::x.values );
-  clReleaseMemObject ( ::y.values );
+  clReleaseMemObject ( d_normr.value );
+  clReleaseMemObject ( d_minus.value );
+  clReleaseMemObject ( d_rtz.value );
+  clReleaseMemObject ( d_oldrtz.value );
+  clReleaseMemObject ( d_pAp.value );
+  clReleaseMemObject ( d_Alpha.value );
+  clReleaseMemObject ( d_Beta.value );
+  clReleaseMemObject ( d_minusAlpha.value );
+   
+  clReleaseMemObject ( d_A.col_indices );
+  clReleaseMemObject ( d_A.row_pointer );
+  clReleaseMemObject ( d_A.values );
+  
+  clReleaseMemObject ( d_p.values );
+  clReleaseMemObject ( d_Ap.values );
+  clReleaseMemObject ( d_b.values );
+  clReleaseMemObject ( d_r.values );
+  clReleaseMemObject ( d_x.values );
+  
+  clReleaseProgram(program);
+  clReleaseKernel(kernel1);
+  clReleaseKernel(kernel2);
+  clReleaseKernel(kernel3);
   cl_status = clReleaseCommandQueue(command_queue);
   assert(cl_status == CL_SUCCESS && "release commandqueue failed\n");
 

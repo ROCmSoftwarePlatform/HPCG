@@ -26,18 +26,18 @@
 #include "clSPARSE.h"
 #include "clSPARSE-error.h"
 
-cl_platform_id *platform;
+/*cl_platform_id *platform;
 cl_context context;
 cl_device_id *device;
 cl_command_queue command_queue;
-cl_int err;
-cl_int cl_status;
+cl_int err;*/
+extern cl_int cl_status;
 
-clsparseCreateResult createResult;
-clsparseStatus status;
-clsparseScalar alpha;
-clsparseScalar beta;
-cldenseVector x;
+extern clsparseCreateResult createResult;
+extern clsparseStatus status;
+extern clsparseScalar d_alpha;
+extern clsparseScalar d_beta;
+/*cldenseVector x;
 cldenseVector y;
 clsparseCsrMatrix A;
   
@@ -190,7 +190,7 @@ int hpcg2clsparse(const SparseMatrix & hA, Vector & hx, Vector & hy)
                               x.num_values * sizeof( double ), hx.values, 0, NULL, NULL );                                
 
  /* Call the spmv algorithm */
-  status = clsparseDcsrmv(&alpha, &A, &x, &beta, &y, createResult.control);
+  /*status = clsparseDcsrmv(&alpha, &A, &x, &beta, &y, createResult.control);
 
   if (status != clsparseSuccess)
   {
@@ -220,7 +220,7 @@ int hpcg2clsparse(const SparseMatrix & hA, Vector & hx, Vector & hy)
 
   @see ComputeSPMV_ref
 */
-int ComputeSPMV( const SparseMatrix & A, Vector & x, Vector & y) {
+int ComputeSPMV(clsparseCsrMatrix & d_A, cldenseVector & d_x, cldenseVector & d_y) {
   /*struct timeval start, stop;
   gettimeofday(&start, NULL);*/
   //std::cerr << "SPMV" << '\n';
@@ -228,10 +228,18 @@ int ComputeSPMV( const SparseMatrix & A, Vector & x, Vector & y) {
   //A.isSpmvOptimized = false;
   //return ComputeSPMV_ref(A, x, y);
   
-  hpcg2clsparse(A, x, y);
+  //hpcg2clsparse(A, x, y);
   
   /*gettimeofday(&stop, NULL);
   spmv_time += ((((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0);*/
+  
+  status = clsparseDcsrmv(&d_alpha, &d_A, &d_x, &d_beta, &d_y, createResult.control);
+
+  if (status != clsparseSuccess)
+  {
+      std::cerr << "Problem with execution SpMV algorithm."
+                << " Error: " << status << std::endl;
+  }
   
   return 0;
   
