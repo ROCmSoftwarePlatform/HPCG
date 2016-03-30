@@ -14,7 +14,6 @@ __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
   xv[idx + offset] = sum / matrixDiagonal[idx];
 }
 
-
 __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_index,
                           __global int *Colors, __global int *random) {
   int x = get_global_id(0);
@@ -37,5 +36,3 @@ __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_ind
     }
   }
 }
-
-

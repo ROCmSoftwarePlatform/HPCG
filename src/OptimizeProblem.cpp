@@ -24,6 +24,8 @@
 using namespace std;
 int row ;
 
+#define __OCL__
+
 /*!
   Optimizes the data structures used for CG iteration to increase the
   performance of the benchmark version of the preconditioned CG algorithm.
@@ -76,6 +78,15 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<loc
     }
 }
 
+static void lubys_graph_coloring_gpu (int c, int nrow, std::vector<local_int_t> &iColors)
+{
+  LubysGraphKernel::ExecuteKernel(c, nrow, LubysGraphKernel::clColors);
+
+  LubysGraphKernel::ReadBuffer(iColors, LubysGraphKernel::clColors);
+
+  return;
+}
+
 
 int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
 
@@ -119,34 +130,30 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
      ridx++;
   }
 
+#ifdef __OCL__
   LubysGraphKernel::InitCLMem(nrow, row_offset, col_index, random);
-
   LubysGraphKernel::InitCpuMem(nrow * sizeof(int));
-
-  //std::cout << "size: " << nrow << std::endl;
-
   LubysGraphKernel::WriteBuffer(A_ref.colors, LubysGraphKernel::clColors);
-  //hpcg_cl::WriteBuffer(A_ref.colors, hpcg_cl::clTemp);
-  //cl_mem clColors;
-  //cl_mem clTemp;
+#endif
 
   // Call luby's graph coloring algorithm.
   int c = 0;
   for( c = 0; c < nrow; c++)
   {
-      LubysGraphKernel::ExecuteKernel(c, nrow, LubysGraphKernel::clColors);
-
-      LubysGraphKernel::ReadBuffer(A_ref.colors, LubysGraphKernel::clColors);
-
-      //lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
+#ifdef __OCL__
+      lubys_graph_coloring_gpu(c, nrow, A_ref.colors);
+#else
+      lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
+#endif
       int left = std::count(A_ref.colors.begin(), A_ref.colors.end(), -1);
         if(left == 0)
           break;
   }
 
+#ifdef __OCL__
   LubysGraphKernel::ReleaseCLMem();
-
   LubysGraphKernel::ReleaseCpuMem();
+#endif
 
   /*std::cout << "total " << nrow
             << " cycle " << c << std::endl;*/
