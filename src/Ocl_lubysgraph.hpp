@@ -4,7 +4,6 @@
 #include "OCL.hpp"
 
 namespace LubysGraphKernel {
-  cl_program  program = 0;
   cl_kernel   kernel = 0;
 
   cl_mem  clRow_offset = NULL;
@@ -16,43 +15,13 @@ namespace LubysGraphKernel {
   int *colors = NULL;
 
   const char *kernel_name = "lubys_graph";
-  const char *Lubys_graph_kernel = "                                                    \n\
-    __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_index, \n\
-                              __global int *Colors, __global int *random)               \n\
-    {                                                                                   \n\
-      int x = get_global_id(0);                                                         \n\
-      int flag = 1;                                                                     \n\
-      if(Colors[x] == -1)                                                               \n\
-      {                                                                                 \n\
-        int ir = random[x];                                                             \n\
-        for(int k = row_offset[x]; k < row_offset[x + 1]; k++)                          \n\
-        {                                                                               \n\
-          int j = col_index[k];                                                         \n\
-          int jc = Colors[j];                                                           \n\
-          if (((jc != -1) && (jc != c)) || (x == j))                                    \n\
-          {                                                                             \n\
-            continue;                                                                   \n\
-          }                                                                             \n\
-          int jr = random[j];                                                           \n\
-          if(ir <= jr)                                                                  \n\
-          {                                                                             \n\
-            flag = 0;                                                                   \n\
-          }                                                                             \n\
-        }                                                                               \n\
-        if(flag)                                                                        \n\
-        {                                                                               \n\
-          Colors[x] = c;                                                                \n\
-        }                                                                               \n\
-      }                                                                                 \n\
-    }                                                                                   \n\
-    ";
 
   void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
   {
     cl_int cl_status = CL_SUCCESS;
     if (NULL == clRow_offset)
     {
-      clRow_offset = clCreateBuffer(hpcg_cl::getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+      clRow_offset = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                     (row_size + 1) * sizeof(int), row_offset, &cl_status);
       if (CL_SUCCESS != cl_status || NULL == clRow_offset)
       {
@@ -63,7 +32,7 @@ namespace LubysGraphKernel {
 
     if (NULL == clCol_index)
     {
-      clCol_index = clCreateBuffer(hpcg_cl::getContext(), CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR,
+      clCol_index = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY  | CL_MEM_COPY_HOST_PTR,
                                    (row_size * 27) * sizeof(int), col_index, &cl_status);
       if (CL_SUCCESS != cl_status || NULL == clCol_index)
       {
@@ -74,7 +43,7 @@ namespace LubysGraphKernel {
 
     if (NULL == clColors)
     {
-      clColors = clCreateBuffer(hpcg_cl::getContext(), CL_MEM_READ_WRITE, row_size * sizeof(int),
+      clColors = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, row_size * sizeof(int),
                                 NULL, &cl_status);
       if (CL_SUCCESS != cl_status || NULL == clColors)
       {
@@ -85,7 +54,7 @@ namespace LubysGraphKernel {
 
     if (NULL == clRandom)
     {
-      clRandom = clCreateBuffer(hpcg_cl::getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+      clRandom = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                 row_size * sizeof(int), random, &cl_status);
       if (CL_SUCCESS != cl_status || NULL == clRandom)
       {
@@ -164,7 +133,7 @@ namespace LubysGraphKernel {
     assert(NULL != colors);
     std::copy(iColors.begin(), iColors.end(), colors);
 
-    cl_status = clEnqueueWriteBuffer(hpcg_cl::getCommandQueue(), clBuf, CL_TRUE, 0, allocSize,
+    cl_status = clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), clBuf, CL_TRUE, 0, allocSize,
                                      colors, 0, NULL, NULL);
     if (CL_SUCCESS != cl_status)
     {
@@ -181,7 +150,7 @@ namespace LubysGraphKernel {
     assert(allocSize == iColors.size() * sizeof(int));
     assert(NULL != colors);
 
-    cl_status |= clEnqueueReadBuffer(hpcg_cl::getCommandQueue(), clBuf, CL_TRUE, 0,
+    cl_status |= clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), clBuf, CL_TRUE, 0,
                                      allocSize, colors, 0, NULL, NULL);
     if (CL_SUCCESS != cl_status)
     {
@@ -196,29 +165,7 @@ namespace LubysGraphKernel {
   void ExecuteKernel(int c, int row_size, cl_mem clMemColors)
   {
     cl_int cl_status = CL_SUCCESS;
-    size_t sourceSize[] = { strlen(Lubys_graph_kernel) };
-    if (!program)
-    {
-      program = clCreateProgramWithSource(hpcg_cl::getContext(), 1, &Lubys_graph_kernel,
-                                          sourceSize, &cl_status);
-      if (CL_SUCCESS != cl_status)
-      {
-        std::cout << "create program failed. status:" << cl_status << std::endl;
-        return;
-      }
-
-      cl_device_id device = hpcg_cl::getDeviceId();
-      cl_status = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
-      if (CL_SUCCESS != cl_status)
-      {
-        std::cout << "clBuild failed. status:" << cl_status << std::endl;
-        char tbuf[0x10000];
-        clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0x10000, tbuf, NULL);
-        std::cout << tbuf <<std::endl;
-        return;
-      }
-    }
-
+    cl_program program = HPCG_OCL::OCL::getOpenCL()->getProgram();
     if (!kernel)
     {
       kernel = clCreateKernel(program, kernel_name, &cl_status);
@@ -237,7 +184,7 @@ namespace LubysGraphKernel {
     clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&clRandom);
 
     size_t global_size[] = {row_size};
-    cl_status = clEnqueueNDRangeKernel(hpcg_cl::getCommandQueue(), kernel, 1, NULL,
+    cl_status = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel, 1, NULL,
                                        global_size, NULL, 0, NULL, NULL);
     if (CL_SUCCESS != cl_status)
     {
@@ -245,7 +192,7 @@ namespace LubysGraphKernel {
       return;
     }
 
-    clFinish(hpcg_cl::getCommandQueue());
+    clFinish(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
 
     return;
   }

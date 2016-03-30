@@ -119,8 +119,6 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
      ridx++;
   }
 
-  hpcg_cl::InitOpenCL();
-
   LubysGraphKernel::InitCLMem(nrow, row_offset, col_index, random);
 
   LubysGraphKernel::InitCpuMem(nrow * sizeof(int));

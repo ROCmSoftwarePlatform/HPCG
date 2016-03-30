@@ -19,7 +19,7 @@ const char *kernel_name = "SYMGS";
 
 void InitCLMem(int localNumberOfRows) {
   if (NULL == clXv) {
-    clXv = clCreateBuffer(hpcg_cl::getContext(), CL_MEM_READ_WRITE,
+    clXv = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE,
                           localNumberOfRows * sizeof(double), NULL, &cl_status);
     if (CL_SUCCESS != cl_status || NULL == clXv) {
       std::cout << "clXv allocation failed. status: " << cl_status << std::endl;
@@ -31,7 +31,7 @@ void InitCLMem(int localNumberOfRows) {
 }
 
 cl_mem CreateCLBuf(cl_mem_flags flags, int size, void *pData) {
-  cl_mem clBuf = clCreateBuffer(hpcg_cl::getContext(), flags, size, pData, &cl_status);
+  cl_mem clBuf = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), flags, size, pData, &cl_status);
   if (CL_SUCCESS != cl_status || NULL == clBuf) {
     std::cout << "CreateCLBuf failed. status: " << cl_status
               << std::endl;
@@ -48,7 +48,7 @@ void ReleaseCLBuf(cl_mem *clBuf) {
 }
 
 void WriteBuffer(cl_mem clBuf, void *pData, int size) {
-  cl_status = clEnqueueWriteBuffer(hpcg_cl::getCommandQueue(), clBuf, CL_TRUE, 0,
+  cl_status = clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), clBuf, CL_TRUE, 0,
                                    size, pData, 0, NULL, NULL);
   if (CL_SUCCESS != cl_status) {
     std::cout << "write buffer failed, status:" << cl_status << std::endl;
@@ -58,7 +58,7 @@ void WriteBuffer(cl_mem clBuf, void *pData, int size) {
 }
 
 void ReadBuffer(cl_mem clBuf, void *pData, int size) {
-  cl_status = clEnqueueReadBuffer(hpcg_cl::getCommandQueue(), clBuf, CL_TRUE, 0,
+  cl_status = clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), clBuf, CL_TRUE, 0,
                                   size, pData, 0, NULL, NULL);
   if (CL_SUCCESS != cl_status) {
     std::cout << "SYMGSKernel Read buffer failed, status:" << cl_status << std::endl;
@@ -86,7 +86,7 @@ void BuildProgram(void) {
 
   if (!program) {
     // create program from buffer
-    program = clCreateProgramWithSource(hpcg_cl::getContext(), 1,
+    program = clCreateProgramWithSource(HPCG_OCL::OCL::getOpenCL()->getContext(), 1,
                                         (const char **) &programBuffer, &programSize, &cl_status);
     free(programBuffer);
 
@@ -95,7 +95,7 @@ void BuildProgram(void) {
       return;
     }
 
-    cl_device_id device = hpcg_cl::getDeviceId();
+    cl_device_id device = HPCG_OCL::OCL::getOpenCL()->getDeviceId();
     cl_status = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
     if (CL_SUCCESS != cl_status) {
       std::cout << "clBuild failed. status:" << cl_status << std::endl;
@@ -126,14 +126,14 @@ void ExecuteKernel(int size, int offset) {
   clSetKernelArg(kernel, 6, sizeof(cl_int), (void *)&offset);
 
   size_t global_size[] = {size};
-  cl_status = clEnqueueNDRangeKernel(hpcg_cl::getCommandQueue(), kernel, 1, NULL,
+  cl_status = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel, 1, NULL,
                                      global_size, NULL, 0, NULL, NULL);
   if (CL_SUCCESS != cl_status) {
     std::cout << "NDRange failed. status:" << cl_status << std::endl;
     return;
   }
 
-  clFinish(hpcg_cl::getCommandQueue());
+  clFinish(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
 
   return;
 }
