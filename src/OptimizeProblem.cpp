@@ -24,6 +24,8 @@
 using namespace std;
 int row ;
 
+#define __OCL__
+
 /*!
   Optimizes the data structures used for CG iteration to increase the
   performance of the benchmark version of the preconditioned CG algorithm.

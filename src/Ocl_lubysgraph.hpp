@@ -16,36 +16,6 @@ namespace LubysGraphKernel {
   int *colors = NULL;
 
   const char *kernel_name = "lubys_graph";
-  const char *Lubys_graph_kernel = "                                                    \n\
-    __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_index, \n\
-                              __global int *Colors, __global int *random)               \n\
-    {                                                                                   \n\
-      int x = get_global_id(0);                                                         \n\
-      int flag = 1;                                                                     \n\
-      if(Colors[x] == -1)                                                               \n\
-      {                                                                                 \n\
-        int ir = random[x];                                                             \n\
-        for(int k = row_offset[x]; k < row_offset[x + 1]; k++)                          \n\
-        {                                                                               \n\
-          int j = col_index[k];                                                         \n\
-          int jc = Colors[j];                                                           \n\
-          if (((jc != -1) && (jc != c)) || (x == j))                                    \n\
-          {                                                                             \n\
-            continue;                                                                   \n\
-          }                                                                             \n\
-          int jr = random[j];                                                           \n\
-          if(ir <= jr)                                                                  \n\
-          {                                                                             \n\
-            flag = 0;                                                                   \n\
-          }                                                                             \n\
-        }                                                                               \n\
-        if(flag)                                                                        \n\
-        {                                                                               \n\
-          Colors[x] = c;                                                                \n\
-        }                                                                               \n\
-      }                                                                                 \n\
-    }                                                                                   \n\
-    ";
 
   void InitCLMem(int row_size, int *row_offset, int *col_index, int *random)
   {
@@ -196,11 +166,28 @@ namespace LubysGraphKernel {
   void ExecuteKernel(int c, int row_size, cl_mem clMemColors)
   {
     cl_int cl_status = CL_SUCCESS;
-    size_t sourceSize[] = { strlen(Lubys_graph_kernel) };
     if (!program)
     {
-      program = clCreateProgramWithSource(hpcg_cl::getContext(), 1, &Lubys_graph_kernel,
-                                          sourceSize, &cl_status);
+      // get size of kernel source
+      FILE *programHandle = fopen("..//..//src//kernel.cl", "r");
+      if (NULL == programHandle) {
+        std::cerr << "Can not open kernel file" << std::endl;
+        return;
+      }
+      fseek(programHandle, 0, SEEK_END);
+      size_t programSize = ftell(programHandle);
+      rewind(programHandle);
+
+      // read kernel source into buffer
+      char *programBuffer  = (char *) malloc(programSize + 1);
+      programBuffer[programSize] = '\0';
+      fread(programBuffer, sizeof(char), programSize, programHandle);
+      fclose(programHandle);
+      program = clCreateProgramWithSource(hpcg_cl::getContext(), 1,
+                                          (const char **)&programBuffer,
+                                          &programSize, &cl_status);
+      free(programBuffer);
+      programBuffer = NULL;
       if (CL_SUCCESS != cl_status)
       {
         std::cout << "create program failed. status:" << cl_status << std::endl;
