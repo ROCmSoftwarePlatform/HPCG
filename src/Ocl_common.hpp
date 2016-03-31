@@ -68,44 +68,7 @@ void ReadBuffer(cl_mem clBuf, void *pData, int size) {
 }
 
 void BuildProgram(void) {
-  // get size of kernel source
-  FILE *programHandle = fopen("..//..//src//kernel.cl", "r");
-  if (NULL == programHandle) {
-    std::cerr << "Can not open kernel file" << std::endl;
-    return;
-  }
-  fseek(programHandle, 0, SEEK_END);
-  size_t programSize = ftell(programHandle);
-  rewind(programHandle);
-
-  // read kernel source into buffer
-  char *programBuffer  = (char *) malloc(programSize + 1);
-  programBuffer[programSize] = '\0';
-  fread(programBuffer, sizeof(char), programSize, programHandle);
-  fclose(programHandle);
-
-  if (!program) {
-    // create program from buffer
-    program = clCreateProgramWithSource(HPCG_OCL::OCL::getOpenCL()->getContext(), 1,
-                                        (const char **) &programBuffer, &programSize, &cl_status);
-    free(programBuffer);
-
-    if (CL_SUCCESS != cl_status) {
-      std::cout << "create program failed. status:" << cl_status << std::endl;
-      return;
-    }
-
-    cl_device_id device = HPCG_OCL::OCL::getOpenCL()->getDeviceId();
-    cl_status = clBuildProgram(program, 1, &device, NULL, NULL, NULL);
-    if (CL_SUCCESS != cl_status) {
-      std::cout << "clBuild failed. status:" << cl_status << std::endl;
-      char tbuf[0x10000];
-      clGetProgramBuildInfo(program, device, CL_PROGRAM_BUILD_LOG, 0x10000, tbuf, NULL);
-      std::cout << tbuf << std::endl;
-      return;
-    }
-  }
-
+  program = HPCG_OCL::OCL::getOpenCL()->getProgram();
   if (!kernel) {
     kernel = clCreateKernel(program, kernel_name, &cl_status);
     if (CL_SUCCESS != cl_status) {
