@@ -54,7 +54,7 @@ using std::endl;
 
   @see CG()
  */
-int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data) {
+int TestCG(SparseMatrix & A, SparseMatrix & A_ref,Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data) {
 
 
   // Use this array for collecting timing information
@@ -94,6 +94,7 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
   testcg_data.niters_max_no_prec = 0;
   testcg_data.niters_max_prec = 0;
  
+#if 0
   // Reference matrix to store reordered sparse matrix depending on Luby's coloring order.
   SparseMatrix A_ref;
   InitializeSparseMatrix(A_ref, geom);
@@ -114,6 +115,7 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
   OptimizeProblem(*A.Ac, *A_ref.Ac);
   OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
   OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+#endif
 
   for (int k=0; k<2; ++k) { // This loop tests both unpreconditioned and preconditioned runs
     int expected_niters = testcg_data.expected_niters_no_prec;
@@ -149,6 +151,6 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
   testcg_data.normr = normr;
 
   //free the reference sparse matrix
-  free_refmatrix_m(A_ref);
+//  free_refmatrix_m(A_ref);
   return 0;
 }
