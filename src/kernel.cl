@@ -1,17 +1,33 @@
 __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
                     __global char *nonzerosInRow, __global double *matrixDiagonal,
                     __global double *rv, __global double *xv, int offset) {
-  int idx = get_global_id(0);
+  __local double temp[32];
+  int idx = get_group_id(0);
+  int ldx = get_local_id(0);
   int currentNumberOfNonzeros = nonzerosInRow[idx];
-  double sum = rv[idx];
-  for (int j = 0; j < currentNumberOfNonzeros; j++) {
-    int curCol = mtxIndL[idx * 27 + j];
-    sum -= matrixValues[idx * 27 + j] * xv[curCol];
-    //sum -= matrixValues[idx * 27 + j];
+
+  temp[ldx] = 0.0;
+  if (ldx < currentNumberOfNonzeros) {
+    int curCol = mtxIndL[idx * 27 + ldx];
+    temp[ldx] = matrixValues[idx * 27 + ldx] * xv[curCol];
   }
 
-  sum += xv[idx + offset] * matrixDiagonal[idx];
-  xv[idx + offset] = sum / matrixDiagonal[idx];
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  int local_size = 32;
+  for (int step = local_size / 2; step > 0; step >>= 1) {
+    if (ldx < step) {
+      temp[ldx] += temp[ldx + step];
+    }
+    barrier(CLK_LOCAL_MEM_FENCE);
+  }
+
+  if (0 == ldx) {
+    double sum = rv[idx];
+    sum -= temp[ldx];
+    sum += xv[idx + offset] * matrixDiagonal[idx];
+    xv[idx + offset] = sum / matrixDiagonal[idx];
+  }
 }
 
 __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_index,

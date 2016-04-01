@@ -88,9 +88,10 @@ void ExecuteKernel(int size, int offset) {
   clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&clXv);
   clSetKernelArg(kernel, 6, sizeof(cl_int), (void *)&offset);
 
-  size_t global_size[] = {size};
+  size_t global_size[] = {size * 32};
+  size_t local_size[] = {32};
   cl_status = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel, 1, NULL,
-                                     global_size, NULL, 0, NULL, NULL);
+                                     global_size, local_size, 0, NULL, NULL);
   if (CL_SUCCESS != cl_status) {
     std::cout << "NDRange failed. status:" << cl_status << std::endl;
     return;
