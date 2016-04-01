@@ -97,7 +97,6 @@ void  leveling(SparseMatrix &A){
             {
               if(A.mtxIndL[i][j] == root_nodes[m])
               {
-                //std::cerr<<"removing k dependency"<<std::endl;
                 matrix[i][j] = 0;
               }
             }
