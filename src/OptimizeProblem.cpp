@@ -169,6 +169,9 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
     A_ref.colors[i] = colors[i];
 
   // Rearranges the reference matrix according to the coloring index.
+  #ifndef HPCG_NO_OPENMP
+    #pragma omp parallel for
+  #endif
 for(int i = 0; i < nrow; i++)
   {   
 	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
@@ -181,6 +184,9 @@ for(int i = 0; i < nrow; i++)
   
 		//rearrange the elements in the row
      int col_indx = 0;
+     #ifndef HPCG_NO_OPENMP
+      #pragma omp parallel for
+     #endif
      for(int k = 0; k < nrow; k++)
      {
 	      for(int j = 0; j < currentNumberOfNonzeros; j++)
