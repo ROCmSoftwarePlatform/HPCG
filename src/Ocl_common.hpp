@@ -23,6 +23,15 @@ void InitCLMem(int localNumberOfRows) {
     }
   }
 
+  if (NULL == clRv) {
+    clRv = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY,
+                          localNumberOfRows * sizeof(double), NULL, &cl_status);
+    if (CL_SUCCESS != cl_status || NULL == clRv) {
+      std::cout << "clXv allocation failed. status: " << cl_status << std::endl;
+      return;
+    }
+  }
+
   return;
 }
 
@@ -95,8 +104,6 @@ void ExecuteKernel(int size, int offset,
     std::cout << "NDRange failed. status:" << cl_status << std::endl;
     return;
   }
-
-  clFinish(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
 
   return;
 }

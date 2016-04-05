@@ -56,23 +56,12 @@ using namespace std;
 
 static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) {
   const local_int_t nrow = A.localNumberOfRows;
-  double **matrixDiagonal = A.matrixDiagonal;   // An array of pointers to the diagonal entries A.matrixValues
-  const double *const rv = r.values;
-  double *const xv = x.values;
-
   local_int_t i = 0;
   int k;
+  SYMGSKernel::BuildProgram();
   SYMGSKernel::InitCLMem(nrow);
   SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
-
-  SYMGSKernel::BuildProgram();
-
-  double *dlRv             = new double[nrow];
-
-  SYMGSKernel::clRv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_ONLY,
-                      nrow * sizeof(double),
-                      NULL);
-
+  SYMGSKernel::WriteBuffer(SYMGSKernel::clRv, (void *)r.values, nrow * sizeof(double));
 
   // forward sweep to be carried out in parallel.
   for (k = 1; k < (int)(A.counters.size()); k++) {
@@ -80,12 +69,6 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
       continue;
     }
     int threadNum = std::min(nrow, A.counters[k]) - i;
-
-    for (int index = 0; index < (threadNum); index++) {
-      dlRv[index] = r.values[i + index];
-    }
-
-    SYMGSKernel::WriteBuffer(SYMGSKernel::clRv, (void *)dlRv, threadNum * sizeof(double));
 
     SYMGSKernel::ExecuteKernel(threadNum,
         i,
@@ -107,12 +90,6 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
 
     int ii = i - threadNum + 1;
 
-    for (int index = 0; index < (threadNum); index++) {
-      dlRv[index] = r.values[ii + index];
-    }
-
-    SYMGSKernel::WriteBuffer(SYMGSKernel::clRv, (void *)dlRv, threadNum * sizeof(double));
-
     SYMGSKernel::ExecuteKernel(threadNum,
         ii,
         A.clMatrixValues,
@@ -123,12 +100,12 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
     i -= (threadNum);
   }
 
+  clFinish(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
+
   SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values,
                           nrow * sizeof(double));
 
   SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clRv);
-
-  delete [] dlRv;
 }
 
 static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) {
