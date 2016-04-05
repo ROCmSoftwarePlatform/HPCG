@@ -4,7 +4,6 @@
 #include "OCL.hpp"
 
 namespace LubysGraphKernel {
-  cl_kernel   kernel = 0;
 
   cl_mem  clRow_offset = NULL;
   cl_mem  clCol_index = NULL;
@@ -165,17 +164,7 @@ namespace LubysGraphKernel {
   void ExecuteKernel(int c, int row_size, cl_mem clMemColors)
   {
     cl_int cl_status = CL_SUCCESS;
-    cl_program program = HPCG_OCL::OCL::getOpenCL()->getProgram();
-    if (!kernel)
-    {
-      kernel = clCreateKernel(program, kernel_name, &cl_status);
-      if (CL_SUCCESS != cl_status)
-      {
-        std::cout << "create kernel failed. status:" << cl_status << std::endl;
-        return;
-      }
-    }
-
+    cl_kernel kernel = HPCG_OCL::OCL::getOpenCL()->getKernel_lubys_graph();
     cl_int c1 = c;
     clSetKernelArg(kernel, 0, sizeof(cl_int), (void *)&c1);
     clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&clRow_offset);
