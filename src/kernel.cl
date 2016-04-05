@@ -9,7 +9,7 @@ __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
   temp[ldx] = 0.0;
   if (ldx < currentNumberOfNonzeros) {
     int curCol = mtxIndL[idx * 27 + ldx];
-    temp[ldx] = matrixValues[idx * 27 + ldx] * xv[curCol];
+    temp[ldx] = matrixValues[(idx + offset) * 27 + ldx] * xv[curCol];
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);

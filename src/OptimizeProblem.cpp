@@ -48,39 +48,27 @@ void free_refmatrix_m(SparseMatrix &A)
   }
 
 #ifdef __OCL__
-  if (A.mtxDiagonal != NULL) {
-    delete [] A.mtxDiagonal;
-  }
+  if (A.mtxDiagonal != NULL) delete [] A.mtxDiagonal;
+  if ((*A.Ac).mtxDiagonal != NULL) delete [] (*A.Ac).mtxDiagonal;
+  if ((*A.Ac->Ac).mtxDiagonal != NULL) delete [] (*A.Ac->Ac).mtxDiagonal;
+  if ((*A.Ac->Ac->Ac).mtxDiagonal != NULL) delete [] (*A.Ac->Ac->Ac).mtxDiagonal;
 
-  if ((*A.Ac).mtxDiagonal != NULL) {
-    delete [] (*A.Ac).mtxDiagonal;
-  }
-
-  if ((*A.Ac->Ac).mtxDiagonal != NULL) {
-    delete [] (*A.Ac->Ac).mtxDiagonal;
-  }
-
-  if ((*A.Ac->Ac->Ac).mtxDiagonal != NULL) {
-    delete [] (*A.Ac->Ac->Ac).mtxDiagonal;
-  }
+  if (A.mtxValue != NULL) delete [] A.mtxValue;
+  if ((*A.Ac).mtxValue != NULL) delete [] (*A.Ac).mtxValue;
+  if ((*A.Ac->Ac).mtxValue != NULL) delete [] (*A.Ac->Ac).mtxValue;
+  if ((*A.Ac->Ac->Ac).mtxValue != NULL) delete [] (*A.Ac->Ac->Ac).mtxValue;
 
 
+  if (A.clMatrixDiagonal != NULL) clReleaseMemObject(A.clMatrixDiagonal);
+  if ((*A.Ac).clMatrixDiagonal != NULL) clReleaseMemObject((*A.Ac).clMatrixDiagonal);
+  if ((*A.Ac->Ac).clMatrixDiagonal != NULL) clReleaseMemObject((*A.Ac->Ac).clMatrixDiagonal);
+  if ((*A.Ac->Ac->Ac).clMatrixDiagonal != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clMatrixDiagonal);
 
-  if (A.clMatrixDiagonal != NULL) {
-    clReleaseMemObject(A.clMatrixDiagonal);
-  }
+  if (A.clMatrixValues != NULL) clReleaseMemObject(A.clMatrixValues);
+  if ((*A.Ac).clMatrixValues != NULL) clReleaseMemObject((*A.Ac).clMatrixValues);
+  if ((*A.Ac->Ac).clMatrixValues != NULL) clReleaseMemObject((*A.Ac->Ac).clMatrixValues);
+  if ((*A.Ac->Ac->Ac).clMatrixValues != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clMatrixValues);
 
-  if ((*A.Ac).clMatrixDiagonal != NULL) {
-    clReleaseMemObject((*A.Ac).clMatrixDiagonal);
-  }
-
-  if ((*A.Ac->Ac).clMatrixDiagonal != NULL) {
-    clReleaseMemObject((*A.Ac->Ac).clMatrixDiagonal);
-  }
-
-  if ((*A.Ac->Ac->Ac).clMatrixDiagonal != NULL) {
-    clReleaseMemObject((*A.Ac->Ac->Ac).clMatrixDiagonal);
-  }
 #endif
 }
 
