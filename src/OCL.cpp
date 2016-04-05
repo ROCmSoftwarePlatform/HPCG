@@ -113,6 +113,26 @@ void OCL::BuildProgram(void) {
   }
 }
 
+int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
+   int cl_status = CL_SUCCESS;
+  local_int_t nrow = A_ref.localNumberOfRows;
+  A_ref.mtxDiagonal = new double[nrow * 27];
+  for(int i = 0; i < nrow; ++i) {
+    memcpy((void*)&(A_ref.mtxDiagonal[i * 27]), (void *)A_ref.matrixDiagonal[i], 27 * sizeof(double));
+  }
+
+   A_ref.clMatrixDiagonal = clCreateBuffer(context,
+       CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+       nrow * 27 * sizeof(double),
+       A_ref.mtxDiagonal,
+       &cl_status);
+   if (CL_SUCCESS != cl_status || NULL == A_ref.clMatrixDiagonal) {
+     std::cout << "create buffer failed. status:" << cl_status << std::endl;
+     return -1;
+   }
+   return 0;
+}
+
 cl_context OCL::getContext(void) {
   return context;
 }

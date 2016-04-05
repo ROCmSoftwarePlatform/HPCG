@@ -65,6 +65,10 @@ using std::endl;
 #include <CL/cl.hpp>
 #include "clSPARSE.h"
 
+#ifdef __OCL__
+#include "OCL.hpp"
+#endif
+
 extern cl_context context;
 extern cl_command_queue command_queue;
 extern cl_int cl_status;
@@ -273,6 +277,13 @@ int main(int argc, char * argv[]) {
   OptimizeProblem(*A.Ac, *A_ref.Ac);
   OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
   OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+
+#ifdef __OCL__
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(A, A_ref);
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac, *A_ref.Ac);
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac->Ac, *A_ref.Ac->Ac);
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+#endif
 
   t7 = mytimer() - t7;
   times[7] = t7;

@@ -28,6 +28,10 @@
 #include "Vector.hpp"
 #include "MGData.hpp"
 
+#ifdef __OCL__
+#include <CL/cl.hpp>
+#endif
+
 struct SparseMatrix_STRUCT {
   char  * title; //!< name of the sparse matrix
   Geometry * geom; //!< geometry associated with this matrix
@@ -68,6 +72,14 @@ struct SparseMatrix_STRUCT {
   double * sendBuffer; //!< send buffer for non-blocking sends
 
 #endif
+
+#ifdef __OCL__
+cl_mem  clMatrixValues;
+cl_mem  clMtxIndL;
+cl_mem  clNonzerosInRow;
+cl_mem  clMatrixDiagonal;
+double* mtxDiagonal;
+#endif
 };
 typedef struct SparseMatrix_STRUCT SparseMatrix;
 
@@ -106,6 +118,14 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.receiveLength = 0;
   A.sendLength = 0;
   A.sendBuffer = 0;
+#endif
+
+#ifdef __OCL__
+  A.clMatrixValues = NULL;
+  A.clMtxIndL = NULL;
+  A.clNonzerosInRow = NULL;
+  A.clMatrixDiagonal = NULL;
+  A.mtxDiagonal = NULL;
 #endif
   A.mgData = 0; // Fine-to-coarse grid transfer initially not defined.
   A.Ac =0;

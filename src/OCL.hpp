@@ -3,6 +3,7 @@
 #define OCL_HPP
 
 
+#include "SparseMatrix.hpp"
 #include <CL/cl.hpp>
 
 namespace HPCG_OCL {
@@ -14,6 +15,7 @@ public:
   cl_device_id getDeviceId(void);
   cl_program getProgram(void);
   cl_command_queue getCommandQueue(void);
+  int initBuffer(SparseMatrix &A, SparseMatrix &A_ref);
 private:
   OCL();
   ~OCL();

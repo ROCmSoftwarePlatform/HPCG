@@ -25,8 +25,8 @@ __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
   if (0 == ldx) {
     double sum = rv[idx];
     sum -= temp[ldx];
-    sum += xv[idx + offset] * matrixDiagonal[idx];
-    xv[idx + offset] = sum / matrixDiagonal[idx];
+    sum += xv[idx + offset] * matrixDiagonal[(idx + offset) * 27];
+    xv[idx + offset] = sum / matrixDiagonal[(idx + offset) * 27];
   }
 }
 

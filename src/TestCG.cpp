@@ -39,6 +39,10 @@ using std::endl;
 #include "GenerateCoarseProblem.hpp"
 #include "SparseMatrix.hpp"
 
+#ifdef __OCL__
+#include "OCL.hpp"
+#endif
+
 
 /*!
   Test the correctness of the Preconditined CG implementation by using a system matrix with a dominant diagonal.
@@ -54,6 +58,7 @@ using std::endl;
 
   @see CG()
  */
+
 int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data) {
 
 
@@ -114,6 +119,13 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
   OptimizeProblem(*A.Ac, *A_ref.Ac);
   OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
   OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+
+#ifdef __OCL__
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(A, A_ref);
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac, *A_ref.Ac);
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac->Ac, *A_ref.Ac->Ac);
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+#endif
 
   for (int k=0; k<2; ++k) { // This loop tests both unpreconditioned and preconditioned runs
     int expected_niters = testcg_data.expected_niters_no_prec;

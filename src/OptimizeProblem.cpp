@@ -24,8 +24,6 @@
 using namespace std;
 int row ;
 
-#define __OCL__
-
 /*!
   Optimizes the data structures used for CG iteration to increase the
   performance of the benchmark version of the preconditioned CG algorithm.
@@ -48,6 +46,42 @@ void free_refmatrix_m(SparseMatrix &A)
     delete [] A.matrixValues[i];
     delete [] A.mtxIndL[i];
   }
+
+#ifdef __OCL__
+  if (A.mtxDiagonal != NULL) {
+    delete [] A.mtxDiagonal;
+  }
+
+  if ((*A.Ac).mtxDiagonal != NULL) {
+    delete [] (*A.Ac).mtxDiagonal;
+  }
+
+  if ((*A.Ac->Ac).mtxDiagonal != NULL) {
+    delete [] (*A.Ac->Ac).mtxDiagonal;
+  }
+
+  if ((*A.Ac->Ac->Ac).mtxDiagonal != NULL) {
+    delete [] (*A.Ac->Ac->Ac).mtxDiagonal;
+  }
+
+
+
+  if (A.clMatrixDiagonal != NULL) {
+    clReleaseMemObject(A.clMatrixDiagonal);
+  }
+
+  if ((*A.Ac).clMatrixDiagonal != NULL) {
+    clReleaseMemObject((*A.Ac).clMatrixDiagonal);
+  }
+
+  if ((*A.Ac->Ac).clMatrixDiagonal != NULL) {
+    clReleaseMemObject((*A.Ac->Ac).clMatrixDiagonal);
+  }
+
+  if ((*A.Ac->Ac->Ac).clMatrixDiagonal != NULL) {
+    clReleaseMemObject((*A.Ac->Ac->Ac).clMatrixDiagonal);
+  }
+#endif
 }
 
 // luby's graph coloring algorthim - nvidia's approach
