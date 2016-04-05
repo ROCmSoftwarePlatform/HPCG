@@ -58,6 +58,10 @@ void free_refmatrix_m(SparseMatrix &A)
   if ((*A.Ac->Ac).mtxValue != NULL) delete [] (*A.Ac->Ac).mtxValue;
   if ((*A.Ac->Ac->Ac).mtxValue != NULL) delete [] (*A.Ac->Ac->Ac).mtxValue;
 
+  if (A.matrixIndL != NULL) delete [] A.matrixIndL;
+  if ((*A.Ac).matrixIndL != NULL) delete [] (*A.Ac).matrixIndL;
+  if ((*A.Ac->Ac).matrixIndL != NULL) delete [] (*A.Ac->Ac).matrixIndL;
+  if ((*A.Ac->Ac->Ac).matrixIndL != NULL) delete [] (*A.Ac->Ac->Ac).matrixIndL;
 
   if (A.clMatrixDiagonal != NULL) clReleaseMemObject(A.clMatrixDiagonal);
   if ((*A.Ac).clMatrixDiagonal != NULL) clReleaseMemObject((*A.Ac).clMatrixDiagonal);
@@ -73,6 +77,11 @@ void free_refmatrix_m(SparseMatrix &A)
   if ((*A.Ac).clNonzerosInRow != NULL) clReleaseMemObject((*A.Ac).clNonzerosInRow);
   if ((*A.Ac->Ac).clNonzerosInRow != NULL) clReleaseMemObject((*A.Ac->Ac).clNonzerosInRow);
   if ((*A.Ac->Ac->Ac).clNonzerosInRow != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clNonzerosInRow);
+
+  if (A.clMtxIndL != NULL) clReleaseMemObject(A.clMtxIndL);
+  if ((*A.Ac).clMtxIndL != NULL) clReleaseMemObject((*A.Ac).clMtxIndL);
+  if ((*A.Ac->Ac).clMtxIndL != NULL) clReleaseMemObject((*A.Ac->Ac).clMtxIndL);
+  if ((*A.Ac->Ac->Ac).clMtxIndL != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clMtxIndL);
 #endif
 }
 

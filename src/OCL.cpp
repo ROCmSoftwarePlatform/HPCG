@@ -118,9 +118,11 @@ int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
   local_int_t nrow = A_ref.localNumberOfRows;
   A_ref.mtxDiagonal = new double[nrow * 27];
   A_ref.mtxValue = new double[nrow * 27];
+  A_ref.matrixIndL = new local_int_t[nrow * 27];
   for(int i = 0; i < nrow; ++i) {
     memcpy((void*)&(A_ref.mtxDiagonal[i * 27]), (void *)A_ref.matrixDiagonal[i], 27 * sizeof(double));
     memcpy((void*)&(A_ref.mtxValue[i * 27]), (void *)A_ref.matrixValues[i], 27 * sizeof(double));
+    memcpy((void*)&(A_ref.matrixIndL[i * 27]), (void *)A_ref.mtxIndL[i], 27 * sizeof(local_int_t));
   }
 
    A_ref.clMatrixDiagonal = clCreateBuffer(context,
@@ -148,10 +150,21 @@ int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
        nrow * sizeof(char),
        A_ref.nonzerosInRow,
        &cl_status);
-   if (CL_SUCCESS != cl_status || NULL == A_ref.clMatrixValues) {
+   if (CL_SUCCESS != cl_status || NULL == A_ref.clNonzerosInRow) {
      std::cout << "create buffer failed. status:" << cl_status << std::endl;
      return -1;
    }
+
+   A_ref.clMtxIndL = clCreateBuffer(context,
+       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+       nrow * 27 * sizeof(local_int_t),
+       A_ref.matrixIndL,
+       &cl_status);
+   if (CL_SUCCESS != cl_status || NULL == A_ref.clMtxIndL) {
+     std::cout << "create buffer failed. status:" << cl_status << std::endl;
+     return -1;
+   }
+
    return 0;
 }
 

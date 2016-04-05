@@ -80,6 +80,7 @@ cl_mem  clNonzerosInRow;
 cl_mem  clMatrixDiagonal;
 double* mtxDiagonal;
 double* mtxValue;
+local_int_t* matrixIndL;
 #endif
 };
 typedef struct SparseMatrix_STRUCT SparseMatrix;
@@ -128,6 +129,7 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.clMatrixDiagonal = NULL;
   A.mtxDiagonal = NULL;
   A.mtxValue = NULL;
+  A.matrixIndL = NULL;
 #endif
   A.mgData = 0; // Fine-to-coarse grid transfer initially not defined.
   A.Ac =0;
