@@ -23,7 +23,7 @@
 #include "ComputeSYMGS.hpp"
 #include "OptimizeProblem.hpp"
 #include "ComputeSYMGS_ref.hpp"
-#include "Ocl_common.hpp"
+#include "OCL.hpp"
 #include <vector>
 using namespace std;
 
@@ -54,14 +54,57 @@ using namespace std;
   @see ComputeSYMGS_ref
 */
 
+namespace SYMGSKernel {
+cl_mem  clRv = NULL;
+cl_mem  clXv = NULL;
+}
+
 static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) {
   const local_int_t nrow = A.localNumberOfRows;
   local_int_t i = 0;
   int k;
-  SYMGSKernel::BuildProgram();
-  SYMGSKernel::InitCLMem(nrow);
-  SYMGSKernel::WriteBuffer(SYMGSKernel::clXv, (void *)x.values, nrow * sizeof(double));
-  SYMGSKernel::WriteBuffer(SYMGSKernel::clRv, (void *)r.values, nrow * sizeof(double));
+
+  int cl_status = CL_SUCCESS;
+  if (NULL == SYMGSKernel::clXv) {
+    SYMGSKernel::clXv = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE,
+                          nrow * sizeof(double), NULL, &cl_status);
+    if (CL_SUCCESS != cl_status || NULL == SYMGSKernel::clXv) {
+      std::cout << "clXv allocation failed. status: " << cl_status << std::endl;
+      return;
+    }
+  }
+  if (NULL == SYMGSKernel::clRv) {
+    SYMGSKernel:: clRv = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY,
+                          nrow * sizeof(double), NULL, &cl_status);
+    if (CL_SUCCESS != cl_status || NULL == SYMGSKernel::clRv) {
+      std::cout << "clXv allocation failed. status: " << cl_status << std::endl;
+      return;
+    }
+  }
+
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                       SYMGSKernel::clXv,
+                       CL_TRUE,
+                       0,
+                       nrow * sizeof(double),
+                       (void *)x.values,
+                       0, NULL, NULL);
+
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                       SYMGSKernel::clRv,
+                       CL_TRUE,
+                       0,
+                       nrow * sizeof(double),
+                       (void *)r.values,
+                       0, NULL, NULL);
+
+  cl_kernel kernel = HPCG_OCL::OCL::getOpenCL()->getKernel_SYMGS();
+  clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&A.clMatrixValues);
+  clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&A.clMtxIndL);
+  clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&A.clNonzerosInRow);
+  clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&A.clMatrixDiagonal);
+  clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&SYMGSKernel::clRv);
+  clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&SYMGSKernel::clXv);
 
   // forward sweep to be carried out in parallel.
   for (k = 1; k < (int)(A.counters.size()); k++) {
@@ -70,12 +113,17 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
     }
     int threadNum = std::min(nrow, A.counters[k]) - i;
 
-    SYMGSKernel::ExecuteKernel(threadNum,
-        i,
-        A.clMatrixValues,
-        A.clMtxIndL,
-        A.clNonzerosInRow,
-        A.clMatrixDiagonal);
+    clSetKernelArg(kernel, 6, sizeof(cl_int), (void *)&i);
+    size_t global_size[] = {threadNum * 32};
+    size_t local_size[] = {32};
+    clEnqueueNDRangeKernel(
+        HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+        kernel,
+        1,
+        NULL,
+        global_size,
+        local_size,
+        0, NULL, NULL);
 
     i += (threadNum);
   }
@@ -87,25 +135,32 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
       continue;
     }
     int threadNum = i - std::max(0, A.counters[k - 1]) + 1;
-
     int ii = i - threadNum + 1;
 
-    SYMGSKernel::ExecuteKernel(threadNum,
-        ii,
-        A.clMatrixValues,
-        A.clMtxIndL,
-        A.clNonzerosInRow,
-        A.clMatrixDiagonal);
+    clSetKernelArg(kernel, 6, sizeof(cl_int), (void *)&ii);
+    size_t global_size[] = {threadNum * 32};
+    size_t local_size[] = {32};
+    clEnqueueNDRangeKernel(
+        HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+        kernel,
+        1,
+        NULL,
+        global_size,
+        local_size,
+        0, NULL, NULL);
 
     i -= (threadNum);
   }
 
-  clFinish(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
+//  clFinish(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
 
-  SYMGSKernel::ReadBuffer(SYMGSKernel::clXv, (void *)x.values,
-                          nrow * sizeof(double));
-
-  SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clRv);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                      SYMGSKernel::clXv,
+                      CL_TRUE,
+                      0,
+                      nrow * sizeof(double),
+                      (void *)x.values,
+                      0, NULL, NULL);
 }
 
 static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) {

@@ -89,9 +89,9 @@ void OCL::BuildProgram(void) {
   fread(programBuffer, sizeof(char), programSize, programHandle);
   fclose(programHandle);
 
+  cl_int  cl_status = CL_SUCCESS;
   if (!program) {
     // create program from buffer
-    cl_int  cl_status = CL_SUCCESS;
     program = clCreateProgramWithSource(getContext(), 1,
                                         (const char **) &programBuffer, &programSize, &cl_status);
     free(programBuffer);
@@ -111,6 +111,23 @@ void OCL::BuildProgram(void) {
       return;
     }
   }
+
+  if (!kernel_lubys_graph) {
+    kernel_lubys_graph = clCreateKernel(program, (const char *)"lubys_graph", &cl_status);
+    if (CL_SUCCESS != cl_status) {
+      std::cout << "SYMGSKernel failed. status:" << cl_status << std::endl;
+      return;
+    }
+  }
+
+  if (!kernel_SYMGS) {
+    kernel_SYMGS = clCreateKernel(program, (const char *)"SYMGS", &cl_status);
+    if (CL_SUCCESS != cl_status) {
+      std::cout << "SYMGSKernel failed. status:" << cl_status << std::endl;
+      return;
+    }
+  }
+
 }
 
 int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
@@ -184,6 +201,13 @@ cl_command_queue OCL::getCommandQueue(void) {
   return command_queue;
 }
 
+cl_kernel OCL::getKernel_SYMGS() {
+  return kernel_SYMGS;
+}
+cl_kernel OCL::getKernel_lubys_graph() {
+  return kernel_lubys_graph;
+}
+
 void OCL::ReleaseOpenCL(void) {
   if (0 != context) {
     clReleaseContext(context);
@@ -199,6 +223,27 @@ void OCL::ReleaseOpenCL(void) {
     free(platform);
     platform = NULL;
   }
+
+  if(NULL != kernel_SYMGS) {
+    clReleaseKernel(kernel_SYMGS);
+    kernel_SYMGS = NULL;
+  }
+
+  if(NULL != kernel_lubys_graph) {
+    clReleaseKernel(kernel_lubys_graph);
+    kernel_lubys_graph = NULL;
+  }
+
+  if(NULL != command_queue) {
+    clReleaseCommandQueue(command_queue);
+    command_queue = NULL;
+  }
+
+  if(NULL != program) {
+    clReleaseProgram(program);
+    program = NULL;
+  }
+
 }
 
 } // namespace OCL
