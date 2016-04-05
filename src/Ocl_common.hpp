@@ -5,7 +5,6 @@
 #include "OCL.hpp"
 namespace SYMGSKernel {
 cl_mem  clMtxIndL = NULL;
-cl_mem  clNonzerosInRow = NULL;
 cl_mem  clRv = NULL;
 cl_mem  clXv = NULL;
 cl_int  cl_status = CL_SUCCESS;
@@ -78,6 +77,7 @@ void BuildProgram(void) {
 
 void ExecuteKernel(int size, int offset,
     cl_mem clMatrixValues,
+    cl_mem clNonzerosInRow,
     cl_mem clMatrixDiagonal) {
   clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&clMatrixValues);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&clMtxIndL);

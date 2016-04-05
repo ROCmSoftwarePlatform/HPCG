@@ -143,6 +143,15 @@ int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
      return -1;
    }
 
+   A_ref.clNonzerosInRow = clCreateBuffer(context,
+       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+       nrow * sizeof(char),
+       A_ref.nonzerosInRow,
+       &cl_status);
+   if (CL_SUCCESS != cl_status || NULL == A_ref.clMatrixValues) {
+     std::cout << "create buffer failed. status:" << cl_status << std::endl;
+     return -1;
+   }
    return 0;
 }
 

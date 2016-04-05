@@ -69,6 +69,10 @@ void free_refmatrix_m(SparseMatrix &A)
   if ((*A.Ac->Ac).clMatrixValues != NULL) clReleaseMemObject((*A.Ac->Ac).clMatrixValues);
   if ((*A.Ac->Ac->Ac).clMatrixValues != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clMatrixValues);
 
+  if (A.clNonzerosInRow != NULL) clReleaseMemObject(A.clNonzerosInRow);
+  if ((*A.Ac).clNonzerosInRow != NULL) clReleaseMemObject((*A.Ac).clNonzerosInRow);
+  if ((*A.Ac->Ac).clNonzerosInRow != NULL) clReleaseMemObject((*A.Ac->Ac).clNonzerosInRow);
+  if ((*A.Ac->Ac->Ac).clNonzerosInRow != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clNonzerosInRow);
 #endif
 }
 

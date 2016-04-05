@@ -68,18 +68,12 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
   SYMGSKernel::BuildProgram();
 
   int  *iMtxIndL           = new int[nrow * 27];
-  char *cNonzerosInRow     = new char[nrow];
   double *dlRv             = new double[nrow];
 
   SYMGSKernel::clMtxIndL = SYMGSKernel::CreateCLBuf(
                              CL_MEM_READ_ONLY,
                              nrow * 27 * sizeof(int),
                              NULL);
-
-  SYMGSKernel::clNonzerosInRow = SYMGSKernel::CreateCLBuf(
-                                   CL_MEM_READ_ONLY,
-                                   nrow * sizeof(char),
-                                   NULL);
 
   SYMGSKernel::clRv = SYMGSKernel::CreateCLBuf(CL_MEM_READ_ONLY,
                       nrow * sizeof(double),
@@ -97,17 +91,16 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
       for (int m = 0; m < 27; m++) {
         iMtxIndL[index * 27 + m] = A.mtxIndL[i + index][m];
       }
-      cNonzerosInRow[index] = A.nonzerosInRow[i + index];
       dlRv[index] = r.values[i + index];
     }
 
     SYMGSKernel::WriteBuffer(SYMGSKernel::clMtxIndL, (void *)iMtxIndL, threadNum * 27 * sizeof(int));
-    SYMGSKernel::WriteBuffer(SYMGSKernel::clNonzerosInRow, (void *)cNonzerosInRow, threadNum * sizeof(char));
     SYMGSKernel::WriteBuffer(SYMGSKernel::clRv, (void *)dlRv, threadNum * sizeof(double));
 
     SYMGSKernel::ExecuteKernel(threadNum,
         i,
         A.clMatrixValues,
+        A.clNonzerosInRow,
         A.clMatrixDiagonal);
 
     i += (threadNum);
@@ -127,17 +120,16 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
       for (int m = 0; m < 27; m++) {
         iMtxIndL[index * 27 + m] = A.mtxIndL[ii + index][m];
       }
-      cNonzerosInRow[index] = A.nonzerosInRow[ii + index];
       dlRv[index] = r.values[ii + index];
     }
 
     SYMGSKernel::WriteBuffer(SYMGSKernel::clMtxIndL, (void *)iMtxIndL, threadNum * 27 * sizeof(int));
-    SYMGSKernel::WriteBuffer(SYMGSKernel::clNonzerosInRow, (void *)cNonzerosInRow, threadNum * sizeof(char));
     SYMGSKernel::WriteBuffer(SYMGSKernel::clRv, (void *)dlRv, threadNum * sizeof(double));
 
     SYMGSKernel::ExecuteKernel(threadNum,
         ii,
         A.clMatrixValues,
+        A.clNonzerosInRow,
         A.clMatrixDiagonal);
 
     i -= (threadNum);
@@ -147,11 +139,9 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
                           nrow * sizeof(double));
 
   SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clMtxIndL);
-  SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clNonzerosInRow);
   SYMGSKernel::ReleaseCLBuf(&SYMGSKernel::clRv);
 
   delete [] iMtxIndL;
-  delete [] cNonzerosInRow;
   delete [] dlRv;
 }
 

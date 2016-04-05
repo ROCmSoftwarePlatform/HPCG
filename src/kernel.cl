@@ -4,7 +4,7 @@ __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
   __local double temp[32];
   int idx = get_group_id(0);
   int ldx = get_local_id(0);
-  int currentNumberOfNonzeros = nonzerosInRow[idx];
+  int currentNumberOfNonzeros = nonzerosInRow[idx + offset];
 
   temp[ldx] = 0.0;
   if (ldx < currentNumberOfNonzeros) {
