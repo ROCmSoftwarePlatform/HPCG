@@ -54,7 +54,7 @@ using std::endl;
 
   @see CG()
  */
-int TestCG(SparseMatrix & A, SparseMatrix & A_ref,Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data) {
+int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data) {
 
 
   // Use this array for collecting timing information
@@ -93,8 +93,7 @@ int TestCG(SparseMatrix & A, SparseMatrix & A_ref,Geometry * geom, CGData & data
   testcg_data.expected_niters_prec = 2;   // For the preconditioned case, we should take about 1 iteration, permit 2
   testcg_data.niters_max_no_prec = 0;
   testcg_data.niters_max_prec = 0;
- 
-#if 0
+
   // Reference matrix to store reordered sparse matrix depending on Luby's coloring order.
   SparseMatrix A_ref;
   InitializeSparseMatrix(A_ref, geom);
@@ -109,13 +108,12 @@ int TestCG(SparseMatrix & A, SparseMatrix & A_ref,Geometry * geom, CGData & data
     curLevelMatrix_ref = curLevelMatrix_ref->Ac; // Make the just-constructed coarse grid the next level
   }
 
-  /* call OptimizeProblem to all grid levels so the reference matrix is reordered 
+  /* call OptimizeProblem to all grid levels so the reference matrix is reordered
   based on Luby's color reordering algorithm*/
   OptimizeProblem(A, A_ref);
   OptimizeProblem(*A.Ac, *A_ref.Ac);
   OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
   OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
-#endif
 
   for (int k=0; k<2; ++k) { // This loop tests both unpreconditioned and preconditioned runs
     int expected_niters = testcg_data.expected_niters_no_prec;
@@ -145,12 +143,12 @@ int TestCG(SparseMatrix & A, SparseMatrix & A_ref,Geometry * geom, CGData & data
   ReplaceMatrixDiagonal(A, origDiagA);
   CopyVector(origB, b);
   // Delete vectors
-  DeleteVector(origDiagA); 
+  DeleteVector(origDiagA);
   DeleteVector(exaggeratedDiagA);
   DeleteVector(origB);
   testcg_data.normr = normr;
 
   //free the reference sparse matrix
-//  free_refmatrix_m(A_ref);
+  free_refmatrix_m(A_ref);
   return 0;
 }

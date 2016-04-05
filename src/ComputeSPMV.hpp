@@ -16,8 +16,6 @@
 #define COMPUTESPMV_HPP
 #include "Vector.hpp"
 #include "SparseMatrix.hpp"
-
-int ComputeSPMV( const SparseMatrix & A, Vector & x, Vector & y);
-int ComputeSPMV_apAp( const SparseMatrix & A, Vector & x, Vector & y);
-
+#include "clSPARSE.h"
+int ComputeSPMV(clsparseCsrMatrix & d_A, cldenseVector & d_x, cldenseVector & d_y);
 #endif  // COMPUTESPMV_HPP

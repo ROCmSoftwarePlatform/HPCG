@@ -15,8 +15,8 @@
 #ifndef COMPUTEDOTPRODUCT_HPP
 #define COMPUTEDOTPRODUCT_HPP
 #include "Vector.hpp"
-int ComputeDotProduct(const local_int_t n, const Vector & x, const Vector & y,
-    double & result, double & time_allreduce, bool & isOptimized);
-int ComputeDotProduct_rr(double & result);
+#include "clSPARSE.h"
+int ComputeDotProduct(cldenseVector & x, cldenseVector & y,
+    clsparseScalar & r, double & time_allreduce);
 
 #endif // COMPUTEDOTPRODUCT_HPP
