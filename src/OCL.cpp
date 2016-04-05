@@ -143,7 +143,7 @@ int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
   }
 
    A_ref.clMatrixDiagonal = clCreateBuffer(context,
-       CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
        nrow * 27 * sizeof(double),
        A_ref.mtxDiagonal,
        &cl_status);
@@ -153,7 +153,7 @@ int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
    }
 
    A_ref.clMatrixValues = clCreateBuffer(context,
-       CL_MEM_READ_ONLY | CL_MEM_USE_HOST_PTR,
+       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
        nrow * 27 * sizeof(double),
        A_ref.mtxValue,
        &cl_status);
