@@ -53,7 +53,6 @@ using namespace std;
 
   @see ComputeSYMGS_ref
 */
-
 namespace SYMGSKernel {
 cl_mem  clRv = NULL;
 cl_mem  clXv = NULL;
