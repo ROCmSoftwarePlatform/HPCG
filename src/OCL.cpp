@@ -208,6 +208,46 @@ int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
    return 0;
 }
 
+int OCL::clsparse_initCsrMatrix(const SparseMatrix h_A, clsparseCsrMatrix &d_A, int *col, int *rowoff) {
+  d_A.num_nonzeros = h_A.totalNumberOfNonzeros;
+  d_A.num_rows = h_A.localNumberOfRows;
+  d_A.num_cols = h_A.localNumberOfColumns;
+  cl_int cl_status;
+  d_A.values = clCreateBuffer(context, CL_MEM_READ_ONLY,
+                              d_A.num_nonzeros * sizeof( double ), NULL, &cl_status );
+  d_A.col_indices = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                   d_A.num_nonzeros * sizeof(clsparseIdx_t), col, &cl_status );
+  d_A.row_pointer = clCreateBuffer(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                   (d_A.num_rows + 1) * sizeof(clsparseIdx_t), rowoff, &cl_status );
+  return 0;
+}
+
+int OCL::clsparse_initDenseVector(cldenseVector &d_, int num_rows) {
+  cl_int cl_status;
+  d_.values = clCreateBuffer(context, CL_MEM_READ_WRITE, num_rows * sizeof(double),
+                             NULL, &cl_status);
+  d_.num_values = num_rows;
+  return 0;
+}
+
+int OCL::clsparse_initScalar(clsparseScalar &d_, double val) {
+  cl_int cl_status;
+  d_.value = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(double),
+                            nullptr, &cl_status);
+  double* t = (double*)clEnqueueMapBuffer(command_queue, d_.value, CL_TRUE, CL_MAP_WRITE,
+                                          0, sizeof(double), 0, nullptr, nullptr, &cl_status);
+  *t = val;
+  cl_status = clEnqueueUnmapMemObject(command_queue, d_.value, t,
+                                      0, nullptr, nullptr);
+  return 0;
+}
+
+int OCL::clsparse_initScalar(clsparseScalar &d_) {
+  cl_int cl_status;
+  d_.value = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(double), NULL, &cl_status);
+  return 0;
+}
+
 cl_context OCL::getContext(void) {
   return context;
 }

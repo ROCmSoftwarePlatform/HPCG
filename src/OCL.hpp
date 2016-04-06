@@ -5,6 +5,7 @@
 
 #include "SparseMatrix.hpp"
 #include <CL/cl.hpp>
+#include "clSPARSE.h"
 
 namespace HPCG_OCL {
 
@@ -21,6 +22,10 @@ public:
   cl_kernel getKernel_rtzCopy();
   cl_kernel getKernel_computeBeta();
   cl_kernel getKernel_computeAlpha();
+  int clsparse_initCsrMatrix(const SparseMatrix h_A, clsparseCsrMatrix &d_A, int *col, int *rowoff);
+  int clsparse_initDenseVector(cldenseVector &d_, int num_rows);
+  int clsparse_initScalar(clsparseScalar &d_);
+  int clsparse_initScalar(clsparseScalar &d_, double val);
 private:
   OCL();
   ~OCL();
@@ -38,6 +43,8 @@ private:
   cl_kernel  kernel_rtzCopy;
   cl_kernel  kernel_computeBeta;
   cl_kernel  kernel_computeAlpha;
+  double *val;
+  int *col, *rowoff;
 };
 
 }
