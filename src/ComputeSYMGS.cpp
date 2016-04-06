@@ -168,47 +168,91 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
   const double *const rv = r.values;
   double *const xv = x.values;
 
+  double *csrValue = new double[A.totalNumberOfNonzeros];
+  double *csrCol = new double[A.totalNumberOfNonzeros];
+  double *csrRowOff = new double[A.localNumberOfRows + 1];
+
+  int index = 0;
+  csrRowOff[0] = 0;
+  for(int i = 1; i <= A.totalNumberOfRows; i++)
+    csrRowOff[i] = csrRowOff[i - 1] + A.nonzerosInRow[i - 1];
+
+  for(int i = 0; i < A.totalNumberOfRows; i++)
+  {
+     for(int j = 0; j < A.nonzerosInRow[i]; j++)
+     {
+       csrValue[index] = A.matrixValues[i][j];
+       csrCol[index] = A.mtxIndL[i][j];
+       index++;
+     }
+  }
+
   // forward sweep to be carried out in parallel.
   local_int_t i = 0;
   int k;
   for (k = 1; k < (int)(A.counters.size()); k++) {
     for (; i < nrow && (i < A.counters[k]); i++) {
-      const double *const currentValues = A.matrixValues[i];
+      /*const double *const currentValues = A.matrixValues[i];
       const local_int_t *const currentColIndices = A.mtxIndL[i];
-      const int currentNumberOfNonzeros = A.nonzerosInRow[i];
+      const int currentNumberOfNonzeros = A.nonzerosInRow[i];*/
       const double  currentDiagonal = matrixDiagonal[i][0]; // Current diagonal value
       double sum = rv[i]; // RHS value
 
-      for (int j = 0; j < currentNumberOfNonzeros; j++) {
+      /*for (int j = 0; j < currentNumberOfNonzeros; j++) {
         local_int_t curCol = currentColIndices[j];
         sum -= currentValues[j] * xv[curCol];
+
+        //std::cout << " " << currentValues[j];
       }
 
       sum += xv[i] * currentDiagonal; // Remove diagonal contribution from previous loop
+      xv[i] = sum / currentDiagonal;*/
+
+      for (int j = csrRowOff[i]; j < csrRowOff[i + 1]; j++) {
+        local_int_t curCol = csrCol[j];
+        sum -= csrValue[j] * xv[curCol];
+      }
+      //std::cout << std::endl;
+
+      sum += xv[i] * currentDiagonal;
       xv[i] = sum / currentDiagonal;
     }
+
+    //std::cout << std::endl << "i " << i << "k " << k << std::endl;
   }
 
   // backward sweep to be computed in parallel.
   i = nrow - 1;
   for (k = (int)(A.counters.size()); k > 0; k--) {
     for (; i >= 0 && (i >= A.counters[(k - 1)]); i--) {
-      const double *const currentValues = A.matrixValues[i];
+      /*const double *const currentValues = A.matrixValues[i];
       const local_int_t *const currentColIndices = A.mtxIndL[i];
-      const int currentNumberOfNonzeros = A.nonzerosInRow[i];
+      const int currentNumberOfNonzeros = A.nonzerosInRow[i];*/
       const double  currentDiagonal = matrixDiagonal[i][0]; // Current diagonal value
       double sum = rv[i]; // RHS value
 
-      for (int j = 0; j < currentNumberOfNonzeros; j++) {
+      /*for (int j = 0; j < currentNumberOfNonzeros; j++) {
         local_int_t curCol = currentColIndices[j];
         sum -= currentValues[j] * xv[curCol];
 
       }
 
       sum += xv[i] * currentDiagonal; // Remove diagonal contribution from previous loop
+      xv[i] = sum / currentDiagonal;*/
+
+      for (int j = csrRowOff[i]; j < csrRowOff[i + 1]; j++) {
+        local_int_t curCol = csrCol[j];
+        sum -= csrValue[j] * xv[curCol];
+      }
+
+      sum += xv[i] * currentDiagonal;
       xv[i] = sum / currentDiagonal;
     }
   }
+
+  delete [] csrValue;
+  delete [] csrCol;
+  delete [] csrRowOff;
 }
 
 
