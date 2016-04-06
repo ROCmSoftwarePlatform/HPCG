@@ -128,6 +128,29 @@ void OCL::BuildProgram(void) {
     }
   }
 
+  if (!kernel_rtzCopy) {
+    kernel_rtzCopy = clCreateKernel(program, (const char *)"rtzCopy", &cl_status);
+    if (CL_SUCCESS != cl_status) {
+      std::cout << "SYMGSKernel failed. status:" << cl_status << std::endl;
+      return;
+    }
+  }
+
+  if (!kernel_computeBeta) {
+    kernel_computeBeta = clCreateKernel(program, (const char *)"computeBeta", &cl_status);
+    if (CL_SUCCESS != cl_status) {
+      std::cout << "SYMGSKernel failed. status:" << cl_status << std::endl;
+      return;
+    }
+  }
+
+  if (!kernel_computeAlpha) {
+    kernel_computeAlpha = clCreateKernel(program, (const char *)"computeAlpha", &cl_status);
+    if (CL_SUCCESS != cl_status) {
+      std::cout << "SYMGSKernel failed. status:" << cl_status << std::endl;
+      return;
+    }
+  }
 }
 
 int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
@@ -208,6 +231,16 @@ cl_kernel OCL::getKernel_lubys_graph() {
   return kernel_lubys_graph;
 }
 
+cl_kernel OCL::getKernel_rtzCopy() {
+  return kernel_rtzCopy;
+}
+cl_kernel OCL::getKernel_computeBeta() {
+  return kernel_computeBeta;
+}
+cl_kernel OCL::getKernel_computeAlpha() {
+  return kernel_computeAlpha;
+}
+
 void OCL::ReleaseOpenCL(void) {
   if (0 != context) {
     clReleaseContext(context);
@@ -232,6 +265,21 @@ void OCL::ReleaseOpenCL(void) {
   if(NULL != kernel_lubys_graph) {
     clReleaseKernel(kernel_lubys_graph);
     kernel_lubys_graph = NULL;
+  }
+
+  if(NULL != kernel_rtzCopy) {
+    clReleaseKernel(kernel_rtzCopy);
+    kernel_rtzCopy = NULL;
+  }
+
+  if(NULL != kernel_computeBeta) {
+    clReleaseKernel(kernel_computeBeta);
+    kernel_computeBeta = NULL;
+  }
+
+  if(NULL != kernel_computeAlpha) {
+    clReleaseKernel(kernel_computeAlpha);
+    kernel_computeAlpha = NULL;
   }
 
   if(NULL != command_queue) {

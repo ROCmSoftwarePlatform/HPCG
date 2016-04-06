@@ -18,6 +18,9 @@ public:
   int initBuffer(SparseMatrix &A, SparseMatrix &A_ref);
   cl_kernel getKernel_SYMGS();
   cl_kernel getKernel_lubys_graph();
+  cl_kernel getKernel_rtzCopy();
+  cl_kernel getKernel_computeBeta();
+  cl_kernel getKernel_computeAlpha();
 private:
   OCL();
   ~OCL();
@@ -32,6 +35,9 @@ private:
   cl_command_queue command_queue;
   cl_kernel  kernel_SYMGS;
   cl_kernel  kernel_lubys_graph;
+  cl_kernel  kernel_rtzCopy;
+  cl_kernel  kernel_computeBeta;
+  cl_kernel  kernel_computeAlpha;
 };
 
 }

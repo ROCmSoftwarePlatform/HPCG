@@ -41,20 +41,14 @@
 #include <CL/cl.hpp>
 #include "clSPARSE.h"
 #include "clSPARSE-error.h"
+#include "OCL.hpp"
 
 // Use TICK and TOCK to time a code section in MATLAB-like fashion
 #define TICK()  t0 = mytimer() //!< record current time in 't0'
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
 
-cl_platform_id *platform;
-cl_context context;
-cl_device_id *device;
-cl_command_queue command_queue;
 cl_int err;
 cl_int cl_status;
-
-cl_program program;              
-cl_kernel kernel1, kernel2, kernel3;                 
 
 clsparseCreateResult createResult;
 clsparseStatus status;
@@ -66,46 +60,6 @@ double *val;
 int *col, *rowoff;
 
 clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
-
-const char *kernelSource =                                       "\n" \
-"#pragma OPENCL EXTENSION cl_khr_fp64 : enable                   \n" \
-"__kernel void rtzCopy( __global double *rtz,                    \n" \
-"                       __global double *oldrtz)                 \n" \
-"{                                                               \n" \
-"    //Get our global thread ID                                  \n" \
-"    int id = get_global_id(0);                                  \n" \
-"                                                                \n" \
-"    //Make sure we do not go out of bounds                      \n" \
-"    if (!id)                                                    \n" \
-"      *oldrtz = *rtz;                                           \n" \
-"}                                                               \n" \
-"__kernel void computeBeta( __global double *rtz,                \n" \
-"                           __global double *oldrtz,             \n" \
-"                           __global double *beta)               \n" \
-"{                                                               \n" \
-"    //Get our global thread ID                                  \n" \
-"    int id = get_global_id(0);                                  \n" \
-"                                                                \n" \
-"    //Make sure we do not go out of bounds                      \n" \
-"    if (!id)                                                    \n" \
-"      *beta = *rtz / *oldrtz;                                   \n" \
-"}                                                               \n" \
-"__kernel void computeAlpha( __global double *rtz,               \n" \
-"                           __global double *pAp,                \n" \
-"                           __global double *alpha,              \n" \
-"                           __global double *minusAlpha)         \n" \
-"{                                                               \n" \
-"    //Get our global thread ID                                  \n" \
-"    int id = get_global_id(0);                                  \n" \
-"                                                                \n" \
-"    //Make sure we do not go out of bounds                      \n" \
-"    if (!id)                                                    \n" \
-"    {                                                           \n" \
-"      *alpha = *rtz / *pAp;                                     \n" \
-"      *minusAlpha = -(*alpha);                                  \n" \
-"    }                                                           \n" \
-"}                                                               \n" \
-                                                                "\n" ;
 
 /*!
   Routine to compute an approximate solution to Ax = b
@@ -130,52 +84,6 @@ const char *kernelSource =                                       "\n" \
 
 int count_cg;
 
-int opencl_setup()
-{
-  cl_uint ret_num_of_platforms = 0;
-  cl_int err = clGetPlatformIDs(0, NULL, &ret_num_of_platforms);
-  assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
-
-  platform = (cl_platform_id*)malloc(ret_num_of_platforms * sizeof(cl_platform_id));
-  err = clGetPlatformIDs(ret_num_of_platforms, platform, 0);
-  assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
-
-  cl_uint ret_num_of_devices = 0;
-  err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 0, NULL, &ret_num_of_devices);
-   
-  assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
-
-  device = (cl_device_id*)malloc(ret_num_of_devices * sizeof(cl_device_id));
-  err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_GPU , ret_num_of_devices, device, 0);
-  assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
-
-  cl_context_properties property[] = {
-                             	CL_CONTEXT_PLATFORM,
-                        (cl_context_properties)(platform[0]),
-                        0};
-
-  context = clCreateContext(property, ret_num_of_devices, &device[0], NULL, NULL, &err);
-  assert(err == CL_SUCCESS && "clCreateContext failed\n");
-
-  command_queue = clCreateCommandQueue(context, device[0], 0, &err);
-  assert(err == CL_SUCCESS && "clCreateCommandQueue failed \n");
-  
-   // Create the compute program from the source buffer
-    program = clCreateProgramWithSource(context, 1,
-                            (const char **) & kernelSource, NULL, &err);
-  // Build the program executable 
-    clBuildProgram(program, 0, NULL, NULL, NULL, NULL);
- 
-    // Create the compute kernel in the program we wish to run
-    kernel1 = clCreateKernel(program, "rtzCopy", &err);
-    kernel2 = clCreateKernel(program, "computeBeta", &err);
-    kernel3 = clCreateKernel(program, "computeAlpha", &err);
- 
-              
-  
-  return 0;
-}
-
 int clsparse_setup(const SparseMatrix h_A)
 {
   status = clsparseSetup();
@@ -186,7 +94,7 @@ int clsparse_setup(const SparseMatrix h_A)
   }
 
   // Create clsparseControl object
-  createResult = clsparseCreateControl(command_queue);
+  createResult = clsparseCreateControl(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
   CLSPARSE_V( createResult.status, "Failed to create clsparse control" );
   
   clsparseInitCsrMatrix(&d_A);
@@ -213,13 +121,13 @@ int clsparse_setup(const SparseMatrix h_A)
   d_A.num_rows = h_A.localNumberOfRows;
   d_A.num_cols = h_A.localNumberOfColumns;                
                
-  d_A.values = ::clCreateBuffer( context, CL_MEM_READ_ONLY,
+  d_A.values = ::clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY,
                                d_A.num_nonzeros * sizeof( double ), NULL, &cl_status );
   
-  d_A.col_indices = ::clCreateBuffer( context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+  d_A.col_indices = ::clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                    d_A.num_nonzeros * sizeof( clsparseIdx_t ), col, &cl_status );
 
-  d_A.row_pointer = ::clCreateBuffer( context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+  d_A.row_pointer = ::clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                    ( d_A.num_rows + 1 ) * sizeof( clsparseIdx_t ), rowoff, &cl_status );               
                                       
   // This function allocates memory for rowBlocks structure. If not called
@@ -245,65 +153,69 @@ int clsparse_setup(const SparseMatrix h_A)
   clsparseInitScalar(&d_Beta);
   clsparseInitScalar(&d_minusAlpha);
   
-  d_p.values = clCreateBuffer(context, CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
+  d_p.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
                             NULL, &cl_status);    
   d_p.num_values = d_A.num_rows; 
-  d_Ap.values = clCreateBuffer(context, CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
+  d_Ap.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
                             NULL, &cl_status);    
   d_Ap.num_values = d_A.num_rows; 
-  d_b.values = clCreateBuffer(context, CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
+  d_b.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
                             NULL, &cl_status);    
   d_b.num_values = d_A.num_rows;        
-  d_r.values = clCreateBuffer(context, CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
+  d_r.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
                             NULL, &cl_status);    
   d_r.num_values = d_A.num_rows;                
-  d_x.values = clCreateBuffer(context, CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
+  d_x.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
                             NULL, &cl_status);    
   d_x.num_values = d_A.num_rows;                
   double one = 1.0;
   double zero = 0.0;
   double minus = -1.0; 
 
-  d_alpha.value = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(double),
+  d_alpha.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY, sizeof(double),
                                nullptr, &cl_status);
-  d_beta.value = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(double),
+  d_beta.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY, sizeof(double),
                                nullptr, &cl_status);    
-  d_minus.value = clCreateBuffer(context, CL_MEM_READ_ONLY, sizeof(double),
+  d_minus.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY, sizeof(double),
                                nullptr, &cl_status);                                                          
 
   // alpha = 1;
-  double* halpha = (double*) clEnqueueMapBuffer(command_queue, d_alpha.value, CL_TRUE, CL_MAP_WRITE,
+  double* halpha = (double*) clEnqueueMapBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_alpha.value, CL_TRUE, CL_MAP_WRITE,
                                               0, sizeof(double), 0, nullptr, nullptr, &cl_status);
   *halpha = one;
 
-  cl_status = clEnqueueUnmapMemObject(command_queue, d_alpha.value, halpha,
+  cl_status = clEnqueueUnmapMemObject(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_alpha.value, halpha,
                                       0, nullptr, nullptr);
 
   //beta = 0;
-  double* hbeta = (double*) clEnqueueMapBuffer(command_queue, d_beta.value, CL_TRUE, CL_MAP_WRITE,
+  double* hbeta = (double*) clEnqueueMapBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_beta.value, CL_TRUE, CL_MAP_WRITE,
                                              0, sizeof(double), 0, nullptr, nullptr, &cl_status);
   *hbeta = zero;
 
-  cl_status = clEnqueueUnmapMemObject(command_queue, d_beta.value, hbeta,
+  cl_status = clEnqueueUnmapMemObject(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_beta.value, hbeta,
                                       0, nullptr, nullptr);         
-  double* hminus = (double*) clEnqueueMapBuffer(command_queue, d_minus.value, CL_TRUE, CL_MAP_WRITE,
+  double* hminus = (double*) clEnqueueMapBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_minus.value, CL_TRUE, CL_MAP_WRITE,
                                              0, sizeof(double), 0, nullptr, nullptr, &cl_status);
   *hminus = minus;
 
-  cl_status = clEnqueueUnmapMemObject(command_queue, d_minus.value, hminus,
+  cl_status = clEnqueueUnmapMemObject(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_minus.value, hminus,
                                       0, nullptr, nullptr);                                               
-  d_normr.value = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof(double),
+  d_normr.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof(double),
                             NULL, &cl_status);                                                   
   
   // Create the input and output arrays in device memory for our calculation
-    d_rtz.value = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof( double ), &zero, NULL);
-    d_oldrtz.value = clCreateBuffer(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof( double ), &zero, NULL);
-    d_pAp.value = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
-    d_Beta.value = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
-    d_Alpha.value = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
-    d_minusAlpha.value = clCreateBuffer(context, CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
+    d_rtz.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof( double ), &zero, NULL);
+    d_oldrtz.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof( double ), &zero, NULL);
+    d_pAp.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
+    d_Beta.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
+    d_Alpha.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
+    d_minusAlpha.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
     
-     // Set the arguments to our compute kernel
+    cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel_rtzCopy();
+    cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeBeta();
+    cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeAlpha();
+
+    // Set the arguments to our compute kernel
     err  = clSetKernelArg(kernel1, 0, sizeof(cl_mem), &d_rtz.value);
     err |= clSetKernelArg(kernel1, 1, sizeof(cl_mem), &d_oldrtz.value);      
     
@@ -338,7 +250,6 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
   
   if (!call_count) 
   {  
-    opencl_setup();
     clsparse_setup(A);
     ++call_count; 
   } 
@@ -369,11 +280,11 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
      }
   }                            
   
-  clEnqueueWriteBuffer(command_queue, d_A.values, CL_TRUE, 0,
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A.values, CL_TRUE, 0,
                               d_A.num_nonzeros * sizeof( double ), val, 0, NULL, NULL ); 
-  clEnqueueWriteBuffer(command_queue, d_p.values, CL_TRUE, 0,
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_p.values, CL_TRUE, 0,
                               d_A.num_rows * sizeof( double ), p.values, 0, NULL, NULL );           
-  clEnqueueWriteBuffer(command_queue, d_b.values, CL_TRUE, 0,
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
                               d_A.num_rows * sizeof( double ), b.values, 0, NULL, NULL );                                                                                                          
   
   TICK(); ComputeSPMV(d_A, d_p, d_Ap); TOCK(t3); // Ap = A*p
@@ -381,9 +292,9 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
   TICK(); ComputeDotProduct(d_r, d_r, d_normr, t4); TOCK(t1);
   
   
-  clEnqueueReadBuffer(command_queue, d_r.values, CL_TRUE, 0,
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_r.values, CL_TRUE, 0,
                               d_r.num_values * sizeof(double), r.values, 0, NULL, NULL );   
-  clEnqueueReadBuffer(command_queue, d_normr.value, CL_TRUE, 0,
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_normr.value, CL_TRUE, 0,
                               sizeof(double), &normr, 0, NULL, NULL );  
                               
   normr = sqrt(normr);                                                                                          
@@ -396,6 +307,10 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
   normr0 = normr;
 
   // Start iterations
+  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel_rtzCopy();
+  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeBeta();
+  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeAlpha();
+
 
   for (int k=1; k<=max_iter && normr/normr0 > tolerance; k++ ) {
     TICK();
@@ -405,7 +320,7 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
       CopyVector (r, z); // copy r to z (no preconditioning)
     TOCK(t5); // Preconditioner apply time
 
-    clEnqueueWriteBuffer(command_queue, d_b.values, CL_TRUE, 0,
+    clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
                               d_A.num_rows * sizeof( double ), z.values, 0, NULL, NULL );     
 
     if (k == 1) {
@@ -416,7 +331,7 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
       //oldrtz = rtz;
  
       // Execute the kernel over the entire range of the data set  
-      err = clEnqueueNDRangeKernel(command_queue, kernel1, 1, NULL, &globalSize, NULL,
+      err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel1, 1, NULL, &globalSize, NULL,
                                                                 0, NULL, NULL);
       
       TICK(); ComputeDotProduct(d_r, d_b, d_rtz, t4); TOCK(t1); // rtz = r'*z
@@ -424,7 +339,7 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
       //beta = rtz/oldrtz;
       
       // Execute the kernel over the entire range of the data set  
-      err = clEnqueueNDRangeKernel(command_queue, kernel2, 1, NULL, &globalSize, NULL,
+      err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel2, 1, NULL, &globalSize, NULL,
                                                                 0, NULL, NULL);
       
       TICK(); ComputeWAXPBY(d_alpha, d_b, d_Beta, d_p, d_p);  TOCK(t2); // p = beta*p + z
@@ -436,14 +351,14 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
     //alpha = rtz/pAp;                     
     
     // Execute the kernel over the entire range of the data set  
-    err = clEnqueueNDRangeKernel(command_queue, kernel3, 1, NULL, &globalSize, NULL,
+    err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel3, 1, NULL, &globalSize, NULL,
                                                               0, NULL, NULL);                                                                 
     
     TICK(); ComputeWAXPBY(d_alpha, d_x, d_Alpha, d_p, d_x);// x = x + alpha*p    
             ComputeWAXPBY(d_alpha, d_r, d_minusAlpha, d_Ap, d_r);  TOCK(t2);// r = r - alpha*Ap
     TICK(); ComputeDotProduct(d_r, d_r, d_normr, t4); TOCK(t1);
     
-    clEnqueueReadBuffer(command_queue, d_normr.value, CL_TRUE, 0,
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_normr.value, CL_TRUE, 0,
                               sizeof(double), &normr, 0, NULL, NULL );  
     
     normr = sqrt(normr);
@@ -453,20 +368,20 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
 #endif
     niters = k;
     
-    clEnqueueReadBuffer(command_queue, d_r.values, CL_TRUE, 0,
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_r.values, CL_TRUE, 0,
                               d_r.num_values * sizeof(double), r.values, 0, NULL, NULL );  
-    clEnqueueReadBuffer(command_queue, d_b.values, CL_TRUE, 0,
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
                               d_b.num_values * sizeof(double), z.values, 0, NULL, NULL );  
                                   
     
   }
 
-    clEnqueueReadBuffer(command_queue, d_p.values, CL_TRUE, 0,
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_p.values, CL_TRUE, 0,
                               d_p.num_values * sizeof(double), p.values, 0, NULL, NULL );  
-    clEnqueueReadBuffer(command_queue, d_Ap.values, CL_TRUE, 0,
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
                               d_Ap.num_values * sizeof(double), Ap.values, 0, NULL, NULL );     
                                                                                                                     
-    clEnqueueReadBuffer(command_queue, d_x.values, CL_TRUE, 0,
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_x.values, CL_TRUE, 0,
                               d_x.num_values * sizeof(double), x.values, 0, NULL, NULL );  
    
   

@@ -69,14 +69,9 @@ using std::endl;
 #include "OCL.hpp"
 #endif
 
-extern cl_context context;
-extern cl_command_queue command_queue;
 extern cl_int cl_status;
 extern clsparseCreateResult createResult;
 extern clsparseStatus status;
-
-extern cl_program program;
-extern cl_kernel kernel1, kernel2, kernel3;
 
 extern clsparseCsrMatrix d_A;
 extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
@@ -463,16 +458,6 @@ int main(int argc, char * argv[]) {
   clReleaseMemObject ( d_b.values );
   clReleaseMemObject ( d_r.values );
   clReleaseMemObject ( d_x.values );
-
-  clReleaseProgram(program);
-  clReleaseKernel(kernel1);
-  clReleaseKernel(kernel2);
-  clReleaseKernel(kernel3);
-  cl_status = clReleaseCommandQueue(command_queue);
-  assert(cl_status == CL_SUCCESS && "release commandqueue failed\n");
-
-  cl_status = clReleaseContext(context);
-  assert(cl_status == CL_SUCCESS && "Release context failed\n");
 
   delete [] val;
   delete [] col;

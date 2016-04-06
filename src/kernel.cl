@@ -1,3 +1,4 @@
+#pragma OPENCL EXTENSION cl_khr_fp64 : enable
 __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
                     __global char *nonzerosInRow, __global double *matrixDiagonal,
                     __global double *rv, __global double *xv, int offset) {
@@ -51,4 +52,38 @@ __kernel void lubys_graph(int c, __global int *row_offset, __global int *col_ind
       Colors[x] = c;
     }
   }
+}
+
+__kernel void rtzCopy( __global double *rtz,
+                       __global double *oldrtz)
+{
+    //Get our global thread ID
+    int id = get_global_id(0);
+    //Make sure we do not go out of bounds
+    if (!id)
+    *oldrtz = *rtz;
+}
+__kernel void computeBeta( __global double *rtz,
+                           __global double *oldrtz,
+                           __global double *beta)
+{
+    //Get our global thread ID
+    int id = get_global_id(0);
+    //Make sure we do not go out of bounds
+    if (!id)
+      *beta = *rtz / *oldrtz;
+}
+__kernel void computeAlpha( __global double *rtz,
+                            __global double *pAp,
+                            __global double *alpha,
+                            __global double *minusAlpha)
+{
+    //Get our global thread ID
+    int id = get_global_id(0);
+    //Make sure we do not go out of bounds
+    if (!id)
+    {
+      *alpha = *rtz / *pAp;
+      *minusAlpha = -(*alpha);
+    }
 }
