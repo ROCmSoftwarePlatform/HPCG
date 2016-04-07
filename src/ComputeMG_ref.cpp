@@ -38,7 +38,6 @@
 */
 int ComputeMG_ref(const SparseMatrix & A, const Vector & r, Vector & x) {
   assert(x.localLength==A.localNumberOfColumns); // Make sure x contain space for halo values
-
   ZeroVector(x); // initialize x to zero
 
   int ierr = 0;
