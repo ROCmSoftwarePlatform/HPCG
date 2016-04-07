@@ -116,19 +116,7 @@ int clsparse_setup(const SparseMatrix h_A)
        k++;
      }
   }             
-  
-  d_A.num_nonzeros = h_A.totalNumberOfNonzeros;
-  d_A.num_rows = h_A.localNumberOfRows;
-  d_A.num_cols = h_A.localNumberOfColumns;                
-               
-  d_A.values = ::clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY,
-                               d_A.num_nonzeros * sizeof( double ), NULL, &cl_status );
-  
-  d_A.col_indices = ::clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   d_A.num_nonzeros * sizeof( clsparseIdx_t ), col, &cl_status );
-
-  d_A.row_pointer = ::clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   ( d_A.num_rows + 1 ) * sizeof( clsparseIdx_t ), rowoff, &cl_status );               
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, d_A, col, rowoff);
                                       
   // This function allocates memory for rowBlocks structure. If not called
   // the structure will not be calculated and clSPARSE will run the vectorized
@@ -152,84 +140,49 @@ int clsparse_setup(const SparseMatrix h_A)
   clsparseInitScalar(&d_Alpha);
   clsparseInitScalar(&d_Beta);
   clsparseInitScalar(&d_minusAlpha);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_p,  d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_Ap, d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_b,  d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_r,  d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_x,  d_A.num_rows);
   
-  d_p.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
-                            NULL, &cl_status);    
-  d_p.num_values = d_A.num_rows; 
-  d_Ap.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
-                            NULL, &cl_status);    
-  d_Ap.num_values = d_A.num_rows; 
-  d_b.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
-                            NULL, &cl_status);    
-  d_b.num_values = d_A.num_rows;        
-  d_r.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
-                            NULL, &cl_status);    
-  d_r.num_values = d_A.num_rows;                
-  d_x.values = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, d_A.num_rows * sizeof(double),
-                            NULL, &cl_status);    
-  d_x.num_values = d_A.num_rows;                
+  // d_x.num_values = d_A.num_rows;                
   double one = 1.0;
   double zero = 0.0;
-  double minus = -1.0; 
+  double minus = -1.0;
 
-  d_alpha.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY, sizeof(double),
-                               nullptr, &cl_status);
-  d_beta.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY, sizeof(double),
-                               nullptr, &cl_status);    
-  d_minus.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_ONLY, sizeof(double),
-                               nullptr, &cl_status);                                                          
-
-  // alpha = 1;
-  double* halpha = (double*) clEnqueueMapBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_alpha.value, CL_TRUE, CL_MAP_WRITE,
-                                              0, sizeof(double), 0, nullptr, nullptr, &cl_status);
-  *halpha = one;
-
-  cl_status = clEnqueueUnmapMemObject(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_alpha.value, halpha,
-                                      0, nullptr, nullptr);
-
-  //beta = 0;
-  double* hbeta = (double*) clEnqueueMapBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_beta.value, CL_TRUE, CL_MAP_WRITE,
-                                             0, sizeof(double), 0, nullptr, nullptr, &cl_status);
-  *hbeta = zero;
-
-  cl_status = clEnqueueUnmapMemObject(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_beta.value, hbeta,
-                                      0, nullptr, nullptr);         
-  double* hminus = (double*) clEnqueueMapBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_minus.value, CL_TRUE, CL_MAP_WRITE,
-                                             0, sizeof(double), 0, nullptr, nullptr, &cl_status);
-  *hminus = minus;
-
-  cl_status = clEnqueueUnmapMemObject(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_minus.value, hminus,
-                                      0, nullptr, nullptr);                                               
-  d_normr.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof(double),
-                            NULL, &cl_status);                                                   
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_alpha, one);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_beta,  zero);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minus, minus);
   
   // Create the input and output arrays in device memory for our calculation
-    d_rtz.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof( double ), &zero, NULL);
-    d_oldrtz.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, sizeof( double ), &zero, NULL);
-    d_pAp.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
-    d_Beta.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
-    d_Alpha.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
-    d_minusAlpha.value = clCreateBuffer(HPCG_OCL::OCL::getOpenCL()->getContext(), CL_MEM_READ_WRITE, sizeof( double ), NULL, NULL);
-    
-    cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel_rtzCopy();
-    cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeBeta();
-    cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeAlpha();
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_normr);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_rtz);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_oldrtz);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_pAp);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Beta);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Alpha);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minusAlpha);
 
-    // Set the arguments to our compute kernel
-    err  = clSetKernelArg(kernel1, 0, sizeof(cl_mem), &d_rtz.value);
-    err |= clSetKernelArg(kernel1, 1, sizeof(cl_mem), &d_oldrtz.value);      
+  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel_rtzCopy();
+  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeBeta();
+  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeAlpha();
+
+  // Set the arguments to our compute kernel
+  err  = clSetKernelArg(kernel1, 0, sizeof(cl_mem), &d_rtz.value);
+  err |= clSetKernelArg(kernel1, 1, sizeof(cl_mem), &d_oldrtz.value);      
     
-    // Set the arguments to our compute kernel
-    err  = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &d_rtz.value);
-    err |= clSetKernelArg(kernel2, 1, sizeof(cl_mem), &d_oldrtz.value);
-    err |= clSetKernelArg(kernel2, 2, sizeof(cl_mem), &d_Beta.value);      
-    
-    // Set the arguments to our compute kernel
-    err  = clSetKernelArg(kernel3, 0, sizeof(cl_mem), &d_rtz.value);
-    err |= clSetKernelArg(kernel3, 1, sizeof(cl_mem), &d_pAp.value);
-    err |= clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
-    err |= clSetKernelArg(kernel3, 3, sizeof(cl_mem), &d_minusAlpha.value);      
-  
+  // Set the arguments to our compute kernel
+  err  = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &d_rtz.value);
+  err |= clSetKernelArg(kernel2, 1, sizeof(cl_mem), &d_oldrtz.value);
+  err |= clSetKernelArg(kernel2, 2, sizeof(cl_mem), &d_Beta.value);      
+
+  // Set the arguments to our compute kernel
+  err  = clSetKernelArg(kernel3, 0, sizeof(cl_mem), &d_rtz.value);
+  err |= clSetKernelArg(kernel3, 1, sizeof(cl_mem), &d_pAp.value);
+  err |= clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
+  err |= clSetKernelArg(kernel3, 3, sizeof(cl_mem), &d_minusAlpha.value);      
+
   return 0;
 }
 
