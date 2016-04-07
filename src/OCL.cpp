@@ -155,6 +155,7 @@ void OCL::BuildProgram(void) {
 
 int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
    int cl_status = CL_SUCCESS;
+#if 0
   local_int_t nrow = A_ref.localNumberOfRows;
   A_ref.mtxDiagonal = new double[nrow * 27];
   A_ref.mtxValue = new double[nrow * 27];
@@ -204,8 +205,79 @@ int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
      std::cout << "create buffer failed. status:" << cl_status << std::endl;
      return -1;
    }
+#else
+  local_int_t nrow = A_ref.localNumberOfRows;
+  double *mtxDiagonal = new double[nrow * 27];
+  for(int i = 0; i < nrow; ++i) {
+    memcpy((void*)&(mtxDiagonal[i * 27]), (void *)A_ref.matrixDiagonal[i], 27 * sizeof(double));
+  }
 
-   return 0;
+  double *csrValue = new double[A_ref.totalNumberOfNonzeros];
+  int *csrCol = new int[A_ref.totalNumberOfNonzeros];
+  int *csrRowOff = new int[A_ref.localNumberOfRows + 1];
+
+  int index = 0;
+  csrRowOff[0] = 0;
+  for (int i = 1; i <= A_ref.totalNumberOfRows; i++)
+    csrRowOff[i] = csrRowOff[i - 1] + A_ref.nonzerosInRow[i - 1];
+
+  for (int i = 0; i < A_ref.totalNumberOfRows; i++)
+  {
+     for(int j = 0; j < A_ref.nonzerosInRow[i]; j++)
+     {
+       csrValue[index] = A_ref.matrixValues[i][j];
+       csrCol[index] = A_ref.mtxIndL[i][j];
+       index++;
+     }
+  }
+
+  A_ref.clCsrValues = clCreateBuffer(context,
+       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+       A_ref.totalNumberOfNonzeros * sizeof(double),
+       csrValue,
+       &cl_status);
+  if (CL_SUCCESS != cl_status || NULL == A_ref.clCsrValues) {
+    std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    return -1;
+  }
+
+  A_ref.clCsrCol = clCreateBuffer(context,
+      CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+      A_ref.totalNumberOfNonzeros * sizeof(int),
+      csrCol,
+      &cl_status);
+  if (CL_SUCCESS != cl_status || NULL == A_ref.clCsrCol) {
+    std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    return -1;
+  }
+
+  A_ref.clCsrRowOff = clCreateBuffer(context,
+      CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+      (A_ref.localNumberOfRows + 1) * sizeof(int),
+      csrRowOff,
+      &cl_status);
+  if (CL_SUCCESS != cl_status || NULL == A_ref.clCsrRowOff) {
+    std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    return -1;
+  }
+
+  A_ref.clMatrixDiagonal = clCreateBuffer(context,
+       CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+       nrow * 27 * sizeof(double),
+       mtxDiagonal,
+       &cl_status);
+  if (CL_SUCCESS != cl_status || NULL == A_ref.clMatrixDiagonal) {
+    std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    return -1;
+  }
+
+  delete [] csrValue;
+  delete [] csrCol;
+  delete [] csrRowOff;
+  delete [] mtxDiagonal;
+#endif
+
+  return 0;
 }
 
 cl_context OCL::getContext(void) {

@@ -98,12 +98,21 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
                        0, NULL, NULL);
 
   cl_kernel kernel = HPCG_OCL::OCL::getOpenCL()->getKernel_SYMGS();
+#if 0
   clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&A.clMatrixValues);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&A.clMtxIndL);
   clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&A.clNonzerosInRow);
   clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&A.clMatrixDiagonal);
   clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&SYMGSKernel::clRv);
   clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&SYMGSKernel::clXv);
+#else
+  clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&A.clCsrValues);
+  clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&A.clCsrCol);
+  clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&A.clCsrRowOff);
+  clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&A.clMatrixDiagonal);
+  clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&SYMGSKernel::clRv);
+  clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&SYMGSKernel::clXv);
+#endif
 
   // forward sweep to be carried out in parallel.
   for (k = 1; k < (int)(A.counters.size()); k++) {
@@ -169,8 +178,8 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
   double *const xv = x.values;
 
   double *csrValue = new double[A.totalNumberOfNonzeros];
-  double *csrCol = new double[A.totalNumberOfNonzeros];
-  double *csrRowOff = new double[A.localNumberOfRows + 1];
+  int *csrCol = new int[A.totalNumberOfNonzeros];
+  int *csrRowOff = new int[A.localNumberOfRows + 1];
 
   int index = 0;
   csrRowOff[0] = 0;

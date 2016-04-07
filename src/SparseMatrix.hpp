@@ -74,6 +74,8 @@ struct SparseMatrix_STRUCT {
 #endif
 
 #ifdef __OCL__
+
+#if 0
 cl_mem  clMatrixValues;
 cl_mem  clMtxIndL;
 cl_mem  clNonzerosInRow;
@@ -81,6 +83,13 @@ cl_mem  clMatrixDiagonal;
 double* mtxDiagonal;
 double* mtxValue;
 local_int_t* matrixIndL;
+#else
+cl_mem  clMatrixDiagonal;
+cl_mem  clCsrValues;
+cl_mem  clCsrCol;
+cl_mem  clCsrRowOff;
+#endif
+
 #endif
 };
 typedef struct SparseMatrix_STRUCT SparseMatrix;
@@ -123,6 +132,8 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
 #endif
 
 #ifdef __OCL__
+
+#if 0
   A.clMatrixValues = NULL;
   A.clMtxIndL = NULL;
   A.clNonzerosInRow = NULL;
@@ -130,6 +141,13 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.mtxDiagonal = NULL;
   A.mtxValue = NULL;
   A.matrixIndL = NULL;
+#else
+  A.clMatrixDiagonal = NULL;
+  A.clCsrValues = NULL;
+  A.clCsrCol = NULL;
+  A.clCsrRowOff = NULL;
+#endif
+
 #endif
   A.mgData = 0; // Fine-to-coarse grid transfer initially not defined.
   A.Ac =0;

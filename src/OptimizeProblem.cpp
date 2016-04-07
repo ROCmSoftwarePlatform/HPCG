@@ -48,6 +48,8 @@ void free_refmatrix_m(SparseMatrix &A)
   }
 
 #ifdef __OCL__
+
+#if 0
   if (A.mtxDiagonal != NULL) delete [] A.mtxDiagonal;
   if ((*A.Ac).mtxDiagonal != NULL) delete [] (*A.Ac).mtxDiagonal;
   if ((*A.Ac->Ac).mtxDiagonal != NULL) delete [] (*A.Ac->Ac).mtxDiagonal;
@@ -82,6 +84,29 @@ void free_refmatrix_m(SparseMatrix &A)
   if ((*A.Ac).clMtxIndL != NULL) clReleaseMemObject((*A.Ac).clMtxIndL);
   if ((*A.Ac->Ac).clMtxIndL != NULL) clReleaseMemObject((*A.Ac->Ac).clMtxIndL);
   if ((*A.Ac->Ac->Ac).clMtxIndL != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clMtxIndL);
+#else
+  if (A.clMatrixDiagonal != NULL) clReleaseMemObject(A.clMatrixDiagonal);
+  if ((*A.Ac).clMatrixDiagonal != NULL) clReleaseMemObject((*A.Ac).clMatrixDiagonal);
+  if ((*A.Ac->Ac).clMatrixDiagonal != NULL) clReleaseMemObject((*A.Ac->Ac).clMatrixDiagonal);
+  if ((*A.Ac->Ac->Ac).clMatrixDiagonal != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clMatrixDiagonal);
+
+  if (A.clCsrValues != NULL) clReleaseMemObject(A.clCsrValues);
+  if ((*A.Ac).clCsrValues != NULL) clReleaseMemObject((*A.Ac).clCsrValues);
+  if ((*A.Ac->Ac).clCsrValues != NULL) clReleaseMemObject((*A.Ac->Ac).clCsrValues);
+  if ((*A.Ac->Ac->Ac).clCsrValues != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clCsrValues);
+
+  if (A.clCsrCol != NULL) clReleaseMemObject(A.clCsrCol);
+  if ((*A.Ac).clCsrCol != NULL) clReleaseMemObject((*A.Ac).clCsrCol);
+  if ((*A.Ac->Ac).clCsrCol != NULL) clReleaseMemObject((*A.Ac->Ac).clCsrCol);
+  if ((*A.Ac->Ac->Ac).clCsrCol != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clCsrCol);
+
+  if (A.clCsrRowOff != NULL) clReleaseMemObject(A.clCsrRowOff);
+  if ((*A.Ac).clCsrRowOff != NULL) clReleaseMemObject((*A.Ac).clCsrRowOff);
+  if ((*A.Ac->Ac).clCsrRowOff != NULL) clReleaseMemObject((*A.Ac->Ac).clCsrRowOff);
+  if ((*A.Ac->Ac->Ac).clCsrRowOff != NULL) clReleaseMemObject((*A.Ac->Ac->Ac).clCsrRowOff);
+
+#endif
+
 #endif
 }
 

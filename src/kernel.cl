@@ -1,16 +1,18 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
-__kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
-                    __global char *nonzerosInRow, __global double *matrixDiagonal,
+
+__kernel void SYMGS(__global double *Values, __global int *Col,
+                    __global int *RowOff, __global double *matrixDiagonal,
                     __global double *rv, __global double *xv, int offset) {
   __local double temp[32];
   int idx = get_group_id(0);
   int ldx = get_local_id(0);
-  int currentNumberOfNonzeros = nonzerosInRow[idx + offset];
+  int startIndex = RowOff[idx + offset];
+  int currentNumberOfNonzeros = RowOff[idx + offset + 1] - startIndex;
 
   temp[ldx] = 0.0;
   if (ldx < currentNumberOfNonzeros) {
-    int curCol = mtxIndL[(idx + offset) * 27 + ldx];
-    temp[ldx] = matrixValues[(idx + offset) * 27 + ldx] * xv[curCol];
+    int curCol = Col[startIndex + ldx];
+    temp[ldx] = Values[startIndex + ldx] * xv[curCol];
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);
