@@ -14,6 +14,13 @@ OCL *OCL::getOpenCL(void) {
   return self;
 }
 
+void OCL::destoryOpenCL(void) {
+  if (NULL != self) {
+    delete self;
+  }
+  self = NULL;
+}
+
 OCL::OCL() {
   platform = NULL;
   device = NULL;

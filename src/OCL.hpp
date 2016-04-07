@@ -12,6 +12,7 @@ namespace HPCG_OCL {
 class OCL {
 public:
   static OCL *getOpenCL(void);
+  void destoryOpenCL(void);
   cl_context getContext(void);
   cl_device_id getDeviceId(void);
   cl_program getProgram(void);

@@ -469,6 +469,10 @@ int main(int argc, char * argv[]) {
 #ifndef HPCG_NO_MPI
   MPI_Finalize();
 #endif
+
+#ifdef __OCL__
+    HPCG_OCL::OCL::getOpenCL()->destoryOpenCL();
+#endif
   /*gettimeofday(&stop, NULL);
   std::cout << "\n SPMV time:" << spmv_time;
   std::cout << "\n Total time:" << (((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0;*/
