@@ -44,8 +44,6 @@ private:
   cl_kernel  kernel_rtzCopy;
   cl_kernel  kernel_computeBeta;
   cl_kernel  kernel_computeAlpha;
-  double *val;
-  int *col, *rowoff;
 };
 
 }
