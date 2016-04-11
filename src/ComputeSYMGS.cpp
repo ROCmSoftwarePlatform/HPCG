@@ -122,8 +122,9 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
     int threadNum = std::min(nrow, A.counters[k]) - i;
 
     clSetKernelArg(kernel, 6, sizeof(cl_int), (void *)&i);
-    size_t global_size[] = {threadNum * 32};
-    size_t local_size[] = {32};
+    clSetKernelArg(kernel, 7, sizeof(cl_int), (void *)&threadNum);
+    size_t global_size[] = {(threadNum + 1) / 2 * 2 * 32};
+    size_t local_size[] = {64};
     clEnqueueNDRangeKernel(
         HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
         kernel,
@@ -146,8 +147,9 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
     int ii = i - threadNum + 1;
 
     clSetKernelArg(kernel, 6, sizeof(cl_int), (void *)&ii);
-    size_t global_size[] = {threadNum * 32};
-    size_t local_size[] = {32};
+    clSetKernelArg(kernel, 7, sizeof(cl_int), (void *)&threadNum);
+    size_t global_size[] = {((threadNum + 1) / 2 * 2) * 32};
+    size_t local_size[] = {64};
     clEnqueueNDRangeKernel(
         HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
         kernel,

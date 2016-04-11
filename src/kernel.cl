@@ -2,34 +2,53 @@
 
 __kernel void SYMGS(__global double *Values, __global int *Col,
                     __global int *RowOff, __global double *matrixDiagonal,
-                    __global double *rv, __global double *xv, int offset) {
-  __local double temp[32];
+                    __global double *rv, __global double *xv, int offset, int totalRow) {
+  __local double temp1[64];
+  __local double temp2[64];
   int idx = get_group_id(0);
   int ldx = get_local_id(0);
-  int startIndex = RowOff[idx + offset];
-  int currentNumberOfNonzeros = RowOff[idx + offset + 1] - startIndex;
+  int startIndex1 = RowOff[2 * idx + offset];
+  int currentNumberOfNonzeros1 = RowOff[2 * idx + offset + 1] - startIndex1;
+  int startIndex2 = RowOff[2 * idx + offset + 1];
+  int currentNumberOfNonzeros2 = RowOff[2 * idx + offset + 2] - startIndex2;
 
-  temp[ldx] = 0.0;
-  if (ldx < currentNumberOfNonzeros) {
-    int curCol = Col[startIndex + ldx];
-    temp[ldx] = Values[startIndex + ldx] * xv[curCol];
+  temp1[ldx] = 0.0;
+  temp2[ldx] = 0.0;
+
+  if (ldx < 32) {
+    if (ldx < currentNumberOfNonzeros1) {
+      int curCol = Col[startIndex1 + ldx];
+      temp1[ldx] = Values[startIndex1 + ldx] * xv[curCol];
+    }
+  } else {
+    if (((ldx - 32) < currentNumberOfNonzeros2) && ((2 * idx) != (totalRow - 1))) {
+      int curCol = Col[startIndex2 + ldx - 32];
+      temp2[ldx] = Values[startIndex2 + ldx - 32] * xv[curCol];
+    }
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);
 
-  int local_size = 32;
+  int local_size = 64;
   for (int step = local_size / 2; step > 0; step >>= 1) {
     if (ldx < step) {
-      temp[ldx] += temp[ldx + step];
+      temp1[ldx] += temp1[ldx + step];
+      temp2[ldx] += temp2[ldx + step];
     }
     barrier(CLK_LOCAL_MEM_FENCE);
   }
 
   if (0 == ldx) {
-    double sum = rv[idx + offset];
-    sum -= temp[ldx];
-    sum += xv[idx + offset] * matrixDiagonal[(idx + offset) * 27];
-    xv[idx + offset] = sum / matrixDiagonal[(idx + offset) * 27];
+    double sum1 = rv[2 * idx + offset];
+    sum1 -= temp1[ldx];
+    sum1 += xv[2 * idx + offset] * matrixDiagonal[(2 * idx + offset) * 27];
+    xv[2 * idx + offset] = sum1 / matrixDiagonal[(2 * idx + offset) * 27];
+    if (2 * idx != (totalRow - 1)) {
+      double sum2 = rv[2 * idx + offset + 1];
+      sum2 -= temp2[ldx];
+      sum2 += xv[2 * idx + offset + 1] * matrixDiagonal[(2 * idx + offset + 1) * 27];
+      xv[2 * idx + offset + 1] = sum2 / matrixDiagonal[(2 * idx + offset + 1) * 27];
+    }
   }
 }
 
