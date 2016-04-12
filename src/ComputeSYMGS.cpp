@@ -24,7 +24,6 @@
 #include "OptimizeProblem.hpp"
 #include "ComputeSYMGS_ref.hpp"
 #include "OCL.hpp"
-#include "mytimer.hpp"
 #include <vector>
 using namespace std;
 
@@ -212,12 +211,7 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
   }
 }
 
-extern double tSymgs;
 int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
-
-  std::cout << "Number of colors: " << A.counters.size()
-            << " , nrow:" << A.localNumberOfRows << std::endl;
-  double t1 = mytimer();
   // This line and the next two lines should be removed and your version of ComputeSYMGS should be used.
   assert(x.localLength == A.localNumberOfColumns); // Make sure x contain space for halo values
 #ifndef HPCG_NO_MPI
@@ -229,7 +223,5 @@ int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
 #else
   ComputeSYMGS_CPU(A, r, x);
 #endif
-
-  tSymgs += (mytimer() - t1);
   return 0;
 }

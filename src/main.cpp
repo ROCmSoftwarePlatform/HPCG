@@ -92,7 +92,6 @@ extern int *col, *rowoff;
   @return Returns zero on success and a non-zero value otherwise.
 
 */
-double tSymgs = 0;
 int main(int argc, char * argv[]) {
 
   /*struct timeval start, stop;
@@ -477,6 +476,5 @@ int main(int argc, char * argv[]) {
   /*gettimeofday(&stop, NULL);
   std::cout << "\n SPMV time:" << spmv_time;
   std::cout << "\n Total time:" << (((stop.tv_sec * 1000000) + stop.tv_usec) - ((start.tv_sec * 1000000) + start.tv_usec)) / 1000000.0;*/
-    std::cout << "SYMGS:" << tSymgs << std::endl;
   return 0;
 }
