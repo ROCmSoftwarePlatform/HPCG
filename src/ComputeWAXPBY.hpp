@@ -16,6 +16,6 @@
 #define COMPUTEWAXPBY_HPP
 #include "Vector.hpp"
 #include "clSPARSE.h"
-int ComputeWAXPBY(clsparseScalar alpha, cldenseVector & x,
-    clsparseScalar beta, cldenseVector & y, cldenseVector & w);
+int ComputeWAXPBY(clsparseScalar alpha, cldenseVector &x, clsparseScalar beta,
+                  cldenseVector &y, cldenseVector &w, clsparseCreateResult &createResult);
 #endif // COMPUTEWAXPBY_HPP

@@ -43,50 +43,11 @@
   @see ComputeWAXPBY_ref
 */
 
-/*clsparseScalar d_beta;
-
-extern cl_context context;
-extern cl_command_queue command_queue;
-extern cl_int cl_status;*/
-extern clsparseCreateResult createResult;
-extern clsparseStatus status;
-/*extern clsparseScalar alpha;
-extern cldenseVector x;
-extern cldenseVector y;*/
-
-int ComputeWAXPBY(clsparseScalar alpha, cldenseVector & x,
-    clsparseScalar beta, cldenseVector & y, cldenseVector & w) {
-
-  // This line and the next two lines should be removed and your version of ComputeWAXPBY should be used.
-  //isOptimized = false;
-  //return ComputeWAXPBY_ref(n, h_alpha, h_x, h_beta, h_y, h_w);  
-  
-  /*static int count_axpby;
-  if (!count_axpby)
-  {
-    clsparseInitScalar(&d_beta);
-    d_beta.value =  ::clCreateBuffer (context, CL_MEM_READ_ONLY,
-                          sizeof(double), NULL, &cl_status);                                                                   
-    ++count_axpby;                                                                    
-  }   
-  
-  clEnqueueWriteBuffer(command_queue, d_beta.value, CL_TRUE, 0,
-                              sizeof( double ), &h_beta, 0, NULL, NULL );                                                             
-  clEnqueueWriteBuffer(command_queue, x.values, CL_TRUE, 0,
-                              n * sizeof( double ), h_x.values, 0, NULL, NULL );                              
-  clEnqueueWriteBuffer(command_queue, y.values, CL_TRUE, 0,
-                              n * sizeof( double ), h_y.values, 0, NULL, NULL ); */   
-  
-  status = cldenseDaxpby(&w, &alpha, &x, &beta, &y, createResult.control);
-
-  if (status != clsparseSuccess)
-  {
-      std::cout << "Problem with execution of clsparse AXPBY algorithm"
-                << " error: [" << status << "]" << std::endl;
+int ComputeWAXPBY(clsparseScalar alpha, cldenseVector &x, clsparseScalar beta,
+                  cldenseVector &y, cldenseVector &w, clsparseCreateResult &createResult) {
+  clsparseStatus status = cldenseDaxpby(&w, &alpha, &x, &beta, &y, createResult.control);
+  if (status != clsparseSuccess) {
+    std::cout << "Problem with execution of clsparse AXPBY algorithm" << std::endl;
   }
-  
-  /*clEnqueueReadBuffer(command_queue, y.values, CL_TRUE, 0,
-                              n * sizeof(double), h_w.values, 0, NULL, NULL );  */
-                                                       
   return 0;
 }

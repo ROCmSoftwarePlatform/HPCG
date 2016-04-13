@@ -17,5 +17,6 @@
 #include "Vector.hpp"
 #include "SparseMatrix.hpp"
 #include "clSPARSE.h"
-int ComputeSPMV(clsparseCsrMatrix & d_A, cldenseVector & d_x, cldenseVector & d_y);
+int ComputeSPMV(clsparseCsrMatrix &d_A, cldenseVector &d_x, cldenseVector &d_y,
+                clsparseScalar &d_alpha, clsparseScalar &d_beta, clsparseCreateResult createResult);
 #endif  // COMPUTESPMV_HPP

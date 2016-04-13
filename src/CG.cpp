@@ -21,7 +21,7 @@
 #include <fstream>
 
 #include <cmath>
- #include <iostream>
+#include <iostream>
 
 #include "hpcg.hpp"
 
@@ -29,7 +29,7 @@
 #include "mytimer.hpp"
 #include "ComputeSPMV.hpp"
 #include "ComputeMG.hpp"
- #include "ComputeMG_ref.hpp"
+#include "ComputeMG_ref.hpp"
 #include "ComputeDotProduct.hpp"
 #include "ComputeWAXPBY.hpp"
 #include "OptimizeProblem.hpp"
@@ -46,20 +46,6 @@
 // Use TICK and TOCK to time a code section in MATLAB-like fashion
 #define TICK()  t0 = mytimer() //!< record current time in 't0'
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
-
-cl_int err;
-cl_int cl_status;
-
-clsparseCreateResult createResult;
-clsparseStatus status;
-clsparseCsrMatrix d_A;
-cldenseVector d_p, d_Ap, d_b, d_r, d_x;
-clsparseScalar d_alpha, d_beta, d_normr, d_minus; 
-  
-double *val;
-int *col, *rowoff;
-
-clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
 
 /*!
   Routine to compute an approximate solution to Ax = b
@@ -82,178 +68,77 @@ clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
   @see CG_ref()
 */
 
-int count_cg;
-
-int clsparse_setup(const SparseMatrix h_A)
-{
-  status = clsparseSetup();
-  if (status != clsparseSuccess)
-  {
-      std::cout << "Problem with executing clsparseSetup()" << std::endl;
-      return -3;
-  }
-
-  // Create clsparseControl object
-  createResult = clsparseCreateControl(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
-  CLSPARSE_V( createResult.status, "Failed to create clsparse control" );
-  
-  clsparseInitCsrMatrix(&d_A);
-  
-  val = new double[h_A.totalNumberOfNonzeros];
-  col = new int[h_A.totalNumberOfNonzeros];
-  rowoff = new int[h_A.localNumberOfRows + 1];     
-  
-  int k = 0;
-  rowoff[0] = 0;
-  for(int i = 1; i <= h_A.totalNumberOfRows; i++)
-    rowoff[i] = rowoff[i - 1] + h_A.nonzerosInRow[i - 1];
-    
-  for(int i = 0; i < h_A.totalNumberOfRows; i++) 
-  {
-     for(int j = 0; j < h_A.nonzerosInRow[i]; j++)
-     {
-       col[k] = h_A.mtxIndL[i][j];
-       k++;
-     }
-  }             
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, d_A, col, rowoff);
-                                      
-  // This function allocates memory for rowBlocks structure. If not called
-  // the structure will not be calculated and clSPARSE will run the vectorized
-  // version of SpMV instead of adaptive;
-  clsparseCsrMetaCreate( &d_A, createResult.control );
-  
-  clsparseInitVector(&d_p);
-  clsparseInitVector(&d_Ap);
-  clsparseInitVector(&d_b);
-  clsparseInitVector(&d_r);
-  clsparseInitVector(&d_x);
-  
-  clsparseInitScalar(&d_alpha);
-  clsparseInitScalar(&d_beta);
-  clsparseInitScalar(&d_normr);
-  clsparseInitScalar(&d_minus);
-  
-  clsparseInitScalar(&d_rtz);
-  clsparseInitScalar(&d_oldrtz);
-  clsparseInitScalar(&d_pAp);
-  clsparseInitScalar(&d_Alpha);
-  clsparseInitScalar(&d_Beta);
-  clsparseInitScalar(&d_minusAlpha);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_p,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_Ap, d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_b,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_r,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_x,  d_A.num_rows);
-  
-  // d_x.num_values = d_A.num_rows;                
-  double one = 1.0;
-  double zero = 0.0;
-  double minus = -1.0;
-
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_alpha, one);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_beta,  zero);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minus, minus);
-  
-  // Create the input and output arrays in device memory for our calculation
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_normr);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_rtz);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_oldrtz);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_pAp);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Beta);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Alpha);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minusAlpha);
-
-  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("rtzCopy"));
-  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
-  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
-
-  // Set the arguments to our compute kernel
-  err  = clSetKernelArg(kernel1, 0, sizeof(cl_mem), &d_rtz.value);
-  err |= clSetKernelArg(kernel1, 1, sizeof(cl_mem), &d_oldrtz.value);      
-    
-  // Set the arguments to our compute kernel
-  err  = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &d_rtz.value);
-  err |= clSetKernelArg(kernel2, 1, sizeof(cl_mem), &d_oldrtz.value);
-  err |= clSetKernelArg(kernel2, 2, sizeof(cl_mem), &d_Beta.value);      
-
-  // Set the arguments to our compute kernel
-  err  = clSetKernelArg(kernel3, 0, sizeof(cl_mem), &d_rtz.value);
-  err |= clSetKernelArg(kernel3, 1, sizeof(cl_mem), &d_pAp.value);
-  err |= clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
-  err |= clSetKernelArg(kernel3, 3, sizeof(cl_mem), &d_minusAlpha.value);      
-
-  return 0;
-}
+extern double *val;
+extern clsparseCsrMatrix d_A;
+extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
+extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
+extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
+extern clsparseCreateResult createResult;
 
 
-int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector & b, Vector & x,
-    const int max_iter, const double tolerance, int & niters, double & normr, double & normr0,
-    double * times, bool doPreconditioning) {
-//std::cerr << "CG \n";    
+int CG(const SparseMatrix &A, SparseMatrix &A_ref, CGData &data, const Vector &b, Vector &x,
+       const int max_iter, const double tolerance, int &niters, double &normr, double &normr0,
+       double *times, bool doPreconditioning) {
+  cl_int err;
   double t_begin = mytimer();  // Start timing right away
   normr = 0.0;
   double rtz = 0.0, oldrtz = 0.0, alpha = 0.0, beta = 0.0, pAp = 0.0, minusAlpha = 0.0;
   double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0, t4 = 0.0, t5 = 0.0;
-//#ifndef HPCG_NO_MPI
-//  double t6 = 0.0;
-//#endif
   size_t globalSize = 64;
-  static int call_count;
-  
-  if (!call_count) 
-  {  
-    clsparse_setup(A);
-    ++call_count; 
-  } 
- 
-  local_int_t nrow = A.localNumberOfRows;
-  Vector & r = data.r; // Residual vector
-  Vector & z = data.z; // Preconditioned residual vector
-  Vector & p = data.p; // Direction vector (in MPI mode ncol>=nrow)
-  Vector & Ap = data.Ap;
 
-  if (!doPreconditioning && A.geom->rank==0) HPCG_fout << "WARNING: PERFORMING UNPRECONDITIONED ITERATIONS" << std::endl;
+  local_int_t nrow = A.localNumberOfRows;
+  Vector &r = data.r;  // Residual vector
+  Vector &z = data.z;  // Preconditioned residual vector
+  Vector &p = data.p;  // Direction vector (in MPI mode ncol>=nrow)
+  Vector &Ap = data.Ap;
+
+  if (!doPreconditioning && A.geom->rank == 0) {
+    HPCG_fout << "WARNING: PERFORMING UNPRECONDITIONED ITERATIONS" << std::endl;
+  }
 
 #ifdef HPCG_DEBUG
   int print_freq = 1;
-  if (print_freq>50) print_freq=50;
-  if (print_freq<1)  print_freq=1;
+  if (print_freq > 50) {
+    print_freq = 50;
+  }
+  if (print_freq < 1) {
+    print_freq = 1;
+  }
 #endif
   // p is of length ncols, copy x to p for sparse MV operation
   CopyVector(x, p);
   /* Create GPU buffers */
   int k = 0;
-  for(int i = 0; i < A.totalNumberOfRows; i++) 
-  {
-     for(int j = 0; j < A.nonzerosInRow[i]; j++)
-     {
-       val[k] = A.matrixValues[i][j];
-       k++;
-     }
-  }                            
-  
+  for (int i = 0; i < A.totalNumberOfRows; i++) {
+    for (int j = 0; j < A.nonzerosInRow[i]; j++) {
+      val[k] = A.matrixValues[i][j];
+      k++;
+    }
+  }
+
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A.values, CL_TRUE, 0,
-                              d_A.num_nonzeros * sizeof( double ), val, 0, NULL, NULL ); 
+                       d_A.num_nonzeros * sizeof(double), val, 0, NULL, NULL);
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_p.values, CL_TRUE, 0,
-                              d_A.num_rows * sizeof( double ), p.values, 0, NULL, NULL );           
+                       d_A.num_rows * sizeof(double), p.values, 0, NULL, NULL);
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
-                              d_A.num_rows * sizeof( double ), b.values, 0, NULL, NULL );                                                                                                          
-  
-  TICK(); ComputeSPMV(d_A, d_p, d_Ap); TOCK(t3); // Ap = A*p
-  TICK(); ComputeWAXPBY(d_alpha, d_b, d_minus, d_Ap, d_r);  TOCK(t2); // r = b - Ax (x stored in p)
-  TICK(); ComputeDotProduct(d_r, d_r, d_normr, t4); TOCK(t1);
-  
-  
+                       d_A.num_rows * sizeof(double), b.values, 0, NULL, NULL);
+
+  TICK(); ComputeSPMV(d_A, d_p, d_Ap, d_alpha, d_beta, createResult); TOCK(t3); // Ap = A*p
+  TICK(); ComputeWAXPBY(d_alpha, d_b, d_minus, d_Ap, d_r, createResult);  TOCK(t2); // r = b - Ax (x stored in p)
+  TICK(); ComputeDotProduct(d_r, d_r, d_normr, t4, createResult); TOCK(t1);
+
+
   clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_r.values, CL_TRUE, 0,
-                              d_r.num_values * sizeof(double), r.values, 0, NULL, NULL );   
+                      d_r.num_values * sizeof(double), r.values, 0, NULL, NULL);
   clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_normr.value, CL_TRUE, 0,
-                              sizeof(double), &normr, 0, NULL, NULL );  
-                              
-  normr = sqrt(normr);                                                                                          
+                      sizeof(double), &normr, 0, NULL, NULL);
+
+  normr = sqrt(normr);
 
 #ifdef HPCG_DEBUG
-  if (A.geom->rank==0) HPCG_fout << "Initial Residual = "<< normr << std::endl;
+  if (A.geom->rank == 0) {
+    HPCG_fout << "Initial Residual = " << normr << std::endl;
+  }
 #endif
 
   // Record initial residual for convergence testing
@@ -261,92 +146,95 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
 
   // Start iterations
 
-  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("rtzCopy"));
-  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
-  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
+  cl_kernel kernelRtz = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("rtzCopy"));
+  cl_kernel kernelBeta = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
+  cl_kernel kernelAlpha = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
 
-  for (int k=1; k<=max_iter && normr/normr0 > tolerance; k++ ) {
+  for (int k = 1; k <= max_iter && normr / normr0 > tolerance; k++) {
     TICK();
-    if (doPreconditioning)
-      ComputeMG(A, A_ref, r, z); // Apply preconditioner
-    else
-      CopyVector (r, z); // copy r to z (no preconditioning)
+    if (doPreconditioning) {
+      ComputeMG(A, A_ref, r, z);  // Apply preconditioner
+    } else {
+      CopyVector(r, z);  // copy r to z (no preconditioning)
+    }
     TOCK(t5); // Preconditioner apply time
 
     clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
-                              d_A.num_rows * sizeof( double ), z.values, 0, NULL, NULL );     
+                         d_A.num_rows * sizeof(double), z.values, 0, NULL, NULL);
 
     if (k == 1) {
-      TICK(); ComputeWAXPBY(d_alpha, d_b, d_beta, d_b, d_p); TOCK(t2); // Copy Mr to p
-      TICK(); ComputeDotProduct(d_r, d_b, d_rtz, t4); TOCK(t1); // rtz = r'*z
-      
+      TICK(); ComputeWAXPBY(d_alpha, d_b, d_beta, d_b, d_p, createResult); TOCK(t2); // Copy Mr to p
+      TICK(); ComputeDotProduct(d_r, d_b, d_rtz, t4, createResult); TOCK(t1); // rtz = r'*z
+
     } else {
-      //oldrtz = rtz;
- 
-      // Execute the kernel over the entire range of the data set  
-      err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel1, 1, NULL, &globalSize, NULL,
-                                                                0, NULL, NULL);
-      
-      TICK(); ComputeDotProduct(d_r, d_b, d_rtz, t4); TOCK(t1); // rtz = r'*z
-      
-      //beta = rtz/oldrtz;
-      
-      // Execute the kernel over the entire range of the data set  
-      err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel2, 1, NULL, &globalSize, NULL,
-                                                                0, NULL, NULL);
-      
-      TICK(); ComputeWAXPBY(d_alpha, d_b, d_Beta, d_p, d_p);  TOCK(t2); // p = beta*p + z
+      // Execute the kernel over the entire range of the data set
+      err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                                   kernelRtz, 1, NULL, &globalSize, NULL,
+                                   0, NULL, NULL);
+      TICK(); ComputeDotProduct(d_r, d_b, d_rtz, t4, createResult); TOCK(t1); // rtz = r'*z
+      // Execute the kernel over the entire range of the data set
+      err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                                   kernelBeta, 1, NULL, &globalSize, NULL,
+                                   0, NULL, NULL);
+      TICK(); ComputeWAXPBY(d_alpha, d_b, d_Beta, d_p, d_p, createResult);  TOCK(t2); // p = beta*p + z
     }
 
-    TICK(); ComputeSPMV(d_A, d_p, d_Ap); TOCK(t3); // Ap = A*p
-    TICK(); ComputeDotProduct(d_p, d_Ap, d_pAp, t4); TOCK(t1); // alpha = p'*Ap
-    
-    //alpha = rtz/pAp;                     
-    
-    // Execute the kernel over the entire range of the data set  
-    err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), kernel3, 1, NULL, &globalSize, NULL,
-                                                              0, NULL, NULL);                                                                 
-    
-    TICK(); ComputeWAXPBY(d_alpha, d_x, d_Alpha, d_p, d_x);// x = x + alpha*p    
-            ComputeWAXPBY(d_alpha, d_r, d_minusAlpha, d_Ap, d_r);  TOCK(t2);// r = r - alpha*Ap
-    TICK(); ComputeDotProduct(d_r, d_r, d_normr, t4); TOCK(t1);
-    
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_normr.value, CL_TRUE, 0,
-                              sizeof(double), &normr, 0, NULL, NULL );  
-    
+    TICK(); ComputeSPMV(d_A, d_p, d_Ap, d_alpha, d_beta, createResult); TOCK(t3); // Ap = A*p
+    TICK(); ComputeDotProduct(d_p, d_Ap, d_pAp, t4, createResult); TOCK(t1); // alpha = p'*Ap
+
+    //alpha = rtz/pAp;
+    // Execute the kernel over the entire range of the data set
+    err = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                                 kernelAlpha, 1, NULL, &globalSize, NULL,
+                                 0, NULL, NULL);
+
+    TICK();
+    ComputeWAXPBY(d_alpha, d_x, d_Alpha, d_p, d_x, createResult);// x = x + alpha*p
+    ComputeWAXPBY(d_alpha, d_r, d_minusAlpha, d_Ap, d_r, createResult);
+    TOCK(t2);// r = r - alpha*Ap
+
+    TICK(); ComputeDotProduct(d_r, d_r, d_normr, t4, createResult); TOCK(t1);
+
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                        d_normr.value, CL_TRUE, 0,
+                        sizeof(double), &normr, 0, NULL, NULL);
+
     normr = sqrt(normr);
 #ifdef HPCG_DEBUG
-    if (A.geom->rank==0 && (k%print_freq == 0 || k == max_iter))
-      HPCG_fout << "Iteration = "<< k << "   Scaled Residual = "<< normr/normr0 << std::endl;
+    if (A.geom->rank == 0 && (k % print_freq == 0 || k == max_iter)) {
+      HPCG_fout << "Iteration = " << k << "   Scaled Residual = " << normr / normr0 << std::endl;
+    }
 #endif
     niters = k;
-    
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_r.values, CL_TRUE, 0,
-                              d_r.num_values * sizeof(double), r.values, 0, NULL, NULL );  
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
-                              d_b.num_values * sizeof(double), z.values, 0, NULL, NULL );  
-                                  
-    
+
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                        d_r.values, CL_TRUE, 0,
+                        d_r.num_values * sizeof(double), r.values,
+                        0, NULL, NULL);
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                        d_b.values, CL_TRUE, 0,
+                        d_b.num_values * sizeof(double), z.values,
+                        0, NULL, NULL);
   }
 
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_p.values, CL_TRUE, 0,
-                              d_p.num_values * sizeof(double), p.values, 0, NULL, NULL );  
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                              d_Ap.num_values * sizeof(double), Ap.values, 0, NULL, NULL );     
-                                                                                                                    
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_x.values, CL_TRUE, 0,
-                              d_x.num_values * sizeof(double), x.values, 0, NULL, NULL );  
-   
-  
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_p.values, CL_TRUE, 0,
+                      d_p.num_values * sizeof(double), p.values, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
+                      d_Ap.num_values * sizeof(double), Ap.values, 0, NULL, NULL);
+
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_x.values, CL_TRUE, 0,
+                      d_x.num_values * sizeof(double), x.values, 0, NULL, NULL);
+
+
   // Store times
   times[1] += t1; // dot-product time
   times[2] += t2; // WAXPBY time
   times[3] += t3; // SPMV time
   times[4] += t4; // AllReduce time
   times[5] += t5; // preconditioner apply time
-//#ifndef HPCG_NO_MPI
-//  times[6] += t6; // exchange halo time
-//#endif
+  //#ifndef HPCG_NO_MPI
+  //  times[6] += t6; // exchange halo time
+  //#endif
   times[0] += mytimer() - t_begin;  // Total time. All done...
   return 0;
 }

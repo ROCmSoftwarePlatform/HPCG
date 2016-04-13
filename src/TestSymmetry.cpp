@@ -48,12 +48,11 @@ using std::endl;
 
 extern clsparseCsrMatrix d_A;
 extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
-extern clsparseScalar d_alpha, d_beta, d_normr, d_minus; 
-  
+extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
 extern double *val;
 extern int *col, *rowoff;
-
 extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
+extern clsparseCreateResult createResult;
 
 /*!
   Tests symmetry-preserving properties of the sparse matrix vector multiply and
@@ -74,134 +73,163 @@ extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
   @see ComputeMG
   @see ComputeMG_ref
 */
-int TestSymmetry(SparseMatrix & A, SparseMatrix &A_ref, Vector & b, Vector & xexact, TestSymmetryData & testsymmetry_data) {
- local_int_t nrow = A.localNumberOfRows;
- local_int_t ncol = A.localNumberOfColumns;
 
- Vector x_ncol, y_ncol, z_ncol;
- InitializeVector(x_ncol, ncol);
- InitializeVector(y_ncol, ncol);
- InitializeVector(z_ncol, ncol);
+int TestSymmetry(SparseMatrix &A, SparseMatrix &A_ref, Vector &b, Vector &xexact, TestSymmetryData &testsymmetry_data) {
+  local_int_t nrow = A.localNumberOfRows;
+  local_int_t ncol = A.localNumberOfColumns;
 
- double t4 = 0.0; // Needed for dot-product call, otherwise unused
- testsymmetry_data.count_fail = 0;
+  Vector x_ncol, y_ncol, z_ncol;
+  InitializeVector(x_ncol, ncol);
+  InitializeVector(y_ncol, ncol);
+  InitializeVector(z_ncol, ncol);
 
- // Test symmetry of matrix
+  double t4 = 0.0; // Needed for dot-product call, otherwise unused
+  testsymmetry_data.count_fail = 0;
 
- // First load vectors with random values
- FillRandomVector(x_ncol);
- FillRandomVector(y_ncol);
+  // Test symmetry of matrix
 
- double xNorm2, yNorm2;
- double ANorm = 2 * 26.0;
+  // First load vectors with random values
+  FillRandomVector(x_ncol);
+  FillRandomVector(y_ncol);
 
- int k = 0;
-  for(int i = 0; i < A.totalNumberOfRows; i++) 
-  {
-     for(int j = 0; j < A.nonzerosInRow[i]; j++)
-     {
-       val[k] = A.matrixValues[i][j];
-       k++;
-     }
-  }        
-  
+  double xNorm2, yNorm2;
+  double ANorm = 2 * 26.0;
+
+  int k = 0;
+  for (int i = 0; i < A.totalNumberOfRows; i++) {
+    for (int j = 0; j < A.nonzerosInRow[i]; j++) {
+      val[k] = A.matrixValues[i][j];
+      k++;
+    }
+  }
+
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A.values, CL_TRUE, 0,
-                              d_A.num_nonzeros * sizeof( double ), val, 0, NULL, NULL ); 
+                       d_A.num_nonzeros * sizeof(double), val, 0, NULL, NULL);
 
- // Next, compute x'*A*y
- ComputeDotProduct(d_p, d_p, d_rtz, t4);
- int ierr = ComputeSPMV(d_A, d_p, d_Ap); // z_nrow = A*y_overlap
- if (ierr) HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
- double xtAy = 0.0;
- ierr = ComputeDotProduct(d_b, d_Ap, d_oldrtz, t4); // x'*A*y
- if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
+  // Next, compute x'*A*y
+  ComputeDotProduct(d_p, d_p, d_rtz, t4, createResult);
+  int ierr = ComputeSPMV(d_A, d_p, d_Ap, d_alpha, d_beta, createResult); // z_nrow = A*y_overlap
+  if (ierr) {
+    HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
+  }
+  double xtAy = 0.0;
+  ierr = ComputeDotProduct(d_b, d_Ap, d_oldrtz, t4, createResult); // x'*A*y
+  if (ierr) {
+    HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
+  }
 
- // Next, compute y'*A*x
- ComputeDotProduct(d_b, d_b, d_Beta, t4);
- ierr = ComputeSPMV(d_A, d_b, d_Ap); // b_computed = A*x_overlap
- if (ierr) HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
- double ytAx = 0.0;
- ierr = ComputeDotProduct(d_p, d_Ap, d_Alpha, t4); // y'*A*x
- if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
- 
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_p.values, CL_TRUE, 0,
-                              d_p.num_values * sizeof( double ), y_ncol.values, 0, NULL, NULL );   
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                              d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL );                                 
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Beta.value, CL_TRUE, 0,
-                              sizeof(double), &xNorm2, 0, NULL, NULL );  
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_rtz.value, CL_TRUE, 0,
-                              sizeof(double), &yNorm2, 0, NULL, NULL ); 
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_oldrtz.value, CL_TRUE, 0,
-                              sizeof(double), &xtAy, 0, NULL, NULL );  
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Alpha.value, CL_TRUE, 0,
-                              sizeof(double), &ytAx, 0, NULL, NULL );                                                              
+  // Next, compute y'*A*x
+  ComputeDotProduct(d_b, d_b, d_Beta, t4, createResult);
+  ierr = ComputeSPMV(d_A, d_b, d_Ap, d_alpha, d_beta, createResult); // b_computed = A*x_overlap
+  if (ierr) {
+    HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
+  }
+  double ytAx = 0.0;
+  ierr = ComputeDotProduct(d_p, d_Ap, d_Alpha, t4, createResult); // y'*A*x
+  if (ierr) {
+    HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
+  }
 
- testsymmetry_data.depsym_spmv = std::fabs((long double) (xtAy - ytAx))/((xNorm2*ANorm*yNorm2 + yNorm2*ANorm*xNorm2) * (DBL_EPSILON));
- if (testsymmetry_data.depsym_spmv > 1.0) ++testsymmetry_data.count_fail;  // If the difference is > 1, count it wrong
- if (A.geom->rank==0) HPCG_fout << "Departure from symmetry (scaled) for SpMV abs(x'*A*y - y'*A*x) = " << testsymmetry_data.depsym_spmv << endl;
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_p.values, CL_TRUE, 0,
+                      d_p.num_values * sizeof(double), y_ncol.values, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
+                      d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Beta.value, CL_TRUE, 0,
+                      sizeof(double), &xNorm2, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_rtz.value, CL_TRUE, 0,
+                      sizeof(double), &yNorm2, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_oldrtz.value, CL_TRUE, 0,
+                      sizeof(double), &xtAy, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Alpha.value, CL_TRUE, 0,
+                      sizeof(double), &ytAx, 0, NULL, NULL);
 
- // Test symmetry of symmetric Gauss-Seidel
+  testsymmetry_data.depsym_spmv = std::fabs((long double)(xtAy - ytAx)) / ((xNorm2 * ANorm * yNorm2 + yNorm2 * ANorm * xNorm2) * (DBL_EPSILON));
+  if (testsymmetry_data.depsym_spmv > 1.0) {
+    ++testsymmetry_data.count_fail;  // If the difference is > 1, count it wrong
+  }
+  if (A.geom->rank == 0) {
+    HPCG_fout << "Departure from symmetry (scaled) for SpMV abs(x'*A*y - y'*A*x) = " << testsymmetry_data.depsym_spmv << endl;
+  }
 
- // Compute x'*Minv*y
- ierr = ComputeMG(A, A_ref, y_ncol, z_ncol); // z_ncol = Minv*y_ncol
+  // Test symmetry of symmetric Gauss-Seidel
 
- if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
- double xtMinvy = 0.0;
- 
- clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                              d_Ap.num_values * sizeof( double ), z_ncol.values, 0, NULL, NULL ); 
- 
- ierr = ComputeDotProduct(d_b, d_Ap, d_minusAlpha, t4); // x'*Minv*y
- if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
-                           
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
-                              d_b.num_values * sizeof( double ), x_ncol.values, 0, NULL, NULL );  
- 
- // Next, compute z'*Minv*x
- ierr = ComputeMG(A, A_ref, x_ncol, z_ncol); // z_ncol = Minv*x_ncol
+  // Compute x'*Minv*y
+  ierr = ComputeMG(A, A_ref, y_ncol, z_ncol); // z_ncol = Minv*y_ncol
 
- if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
- double ytMinvx = 0.0;
- 
- clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                              d_Ap.num_values * sizeof( double ), z_ncol.values, 0, NULL, NULL );                          
- 
- ierr = ComputeDotProduct(d_p, d_Ap, d_pAp, t4); // y'*Minv*x
- if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
- 
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_minusAlpha.value, CL_TRUE, 0,
-                              sizeof(double), &xtMinvy, 0, NULL, NULL );  
- clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_pAp.value, CL_TRUE, 0,
-                              sizeof(double), &ytMinvx, 0, NULL, NULL ); 
-                               
+  if (ierr) {
+    HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
+  }
+  double xtMinvy = 0.0;
 
- testsymmetry_data.depsym_mg = std::fabs((long double) (xtMinvy - ytMinvx))/((xNorm2*ANorm*yNorm2 + yNorm2*ANorm*xNorm2) * (DBL_EPSILON));
- if (testsymmetry_data.depsym_mg > 1.0) ++testsymmetry_data.count_fail;  // If the difference is > 1, count it wrong
- if (A.geom->rank==0) HPCG_fout << "Departure from symmetry (scaled) for MG abs(x'*Minv*y - y'*Minv*x) = " << testsymmetry_data.depsym_mg << endl;
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
+                       d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
 
- CopyVector(xexact, x_ncol); // Copy exact answer into overlap vector
- 
- clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
-                              d_b.num_values * sizeof( double ), x_ncol.values, 0, NULL, NULL ); 
+  ierr = ComputeDotProduct(d_b, d_Ap, d_minusAlpha, t4, createResult); // x'*Minv*y
+  if (ierr) {
+    HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
+  }
 
- int numberOfCalls = 2;
- double residual = 0.0;
- for (int i=0; i< numberOfCalls; ++i) {
-   ierr = ComputeSPMV(d_A, d_b, d_Ap); // b_computed = A*x_overlap
-   if (ierr) HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
-   
-   clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                              d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL ); 
-   
-   if ((ierr = ComputeResidual(A.localNumberOfRows, b, z_ncol, residual)))
-     HPCG_fout << "Error in call to compute_residual: " << ierr << ".\n" << endl;
-   if (A.geom->rank==0) HPCG_fout << "SpMV call [" << i << "] Residual [" << residual << "]" << endl;
- }
- DeleteVector(x_ncol);
- DeleteVector(y_ncol);
- DeleteVector(z_ncol);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
+                      d_b.num_values * sizeof(double), x_ncol.values, 0, NULL, NULL);
 
- return 0;
+  // Next, compute z'*Minv*x
+  ierr = ComputeMG(A, A_ref, x_ncol, z_ncol); // z_ncol = Minv*x_ncol
+
+  if (ierr) {
+    HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
+  }
+  double ytMinvx = 0.0;
+
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
+                       d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
+
+  ierr = ComputeDotProduct(d_p, d_Ap, d_pAp, t4, createResult); // y'*Minv*x
+  if (ierr) {
+    HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
+  }
+
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_minusAlpha.value, CL_TRUE, 0,
+                      sizeof(double), &xtMinvy, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_pAp.value, CL_TRUE, 0,
+                      sizeof(double), &ytMinvx, 0, NULL, NULL);
+
+
+  testsymmetry_data.depsym_mg = std::fabs((long double)(xtMinvy - ytMinvx)) / ((xNorm2 * ANorm * yNorm2 + yNorm2 * ANorm * xNorm2) * (DBL_EPSILON));
+  if (testsymmetry_data.depsym_mg > 1.0) {
+    ++testsymmetry_data.count_fail;  // If the difference is > 1, count it wrong
+  }
+  if (A.geom->rank == 0) {
+    HPCG_fout << "Departure from symmetry (scaled) for MG abs(x'*Minv*y - y'*Minv*x) = " << testsymmetry_data.depsym_mg << endl;
+  }
+
+  CopyVector(xexact, x_ncol); // Copy exact answer into overlap vector
+
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
+                       d_b.num_values * sizeof(double), x_ncol.values, 0, NULL, NULL);
+
+  int numberOfCalls = 2;
+  double residual = 0.0;
+  for (int i = 0; i < numberOfCalls; ++i) {
+    ierr = ComputeSPMV(d_A, d_b, d_Ap, d_alpha, d_beta, createResult); // b_computed = A*x_overlap
+    if (ierr) {
+      HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
+    }
+
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
+                        d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
+
+    if ((ierr = ComputeResidual(A.localNumberOfRows, b, z_ncol, residual))) {
+      HPCG_fout << "Error in call to compute_residual: " << ierr << ".\n" << endl;
+    }
+    if (A.geom->rank == 0) {
+      HPCG_fout << "SpMV call [" << i << "] Residual [" << residual << "]" << endl;
+    }
+  }
+
+  DeleteVector(x_ncol);
+  DeleteVector(y_ncol);
+  DeleteVector(z_ncol);
+
+  return 0;
 }
 
