@@ -60,6 +60,19 @@ using std::endl;
 #include "TestCG.hpp"
 #include "TestSymmetry.hpp"
 #include "TestNorms.hpp"
+#include <CL/cl.hpp>
+#include "clSPARSE.h"
+
+extern cl_context context;
+extern cl_command_queue command_queue;
+extern cl_int cl_status;
+extern clsparseCreateResult createResult;
+extern clsparseStatus status;
+
+extern float *val, *qt_matrixValues;
+extern int *col, *rowOff, *nnzInRow, *Count;
+extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+extern clsparseCsrMatrix d_A, d_Q, d_Qt, d_A_ref;
 
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
@@ -389,6 +402,56 @@ int main(int argc, char * argv[]) {
   delete [] testnorms_data.values;
 
   free_refmatrix_m(A_ref);
+  
+  /* Close & release resources */
+  status = clsparseReleaseControl(createResult.control);
+  if (status != clsparseSuccess)
+  {
+      std::cout << "Problem with releasing control object."
+                << " Error: " << status << std::endl;
+  }
+
+  status = clsparseTeardown();
+
+  if (status != clsparseSuccess)
+  {
+      std::cout << "Problem with closing clSPARSE library."
+                << " Error: " << status << std::endl;
+  }
+  
+  clReleaseMemObject ( d_A.col_indices );
+  clReleaseMemObject ( d_A.row_pointer );
+  clReleaseMemObject ( d_A.values );
+  
+  clReleaseMemObject ( d_Qt.col_indices );
+  clReleaseMemObject ( d_Qt.row_pointer );
+  clReleaseMemObject ( d_Qt.values );
+  
+  clReleaseMemObject ( d_Q.col_indices );
+  clReleaseMemObject ( d_Q.row_pointer );
+  clReleaseMemObject ( d_Q.values );
+  
+  clReleaseMemObject ( d_A_ref.col_indices );
+  clReleaseMemObject ( d_A_ref.row_pointer );
+  clReleaseMemObject ( d_A_ref.values );
+  
+  cl_status = clReleaseCommandQueue(command_queue);
+  assert(cl_status == CL_SUCCESS && "release commandqueue failed\n");
+
+  cl_status = clReleaseContext(context);
+  assert(cl_status == CL_SUCCESS && "Release context failed\n");
+  
+  delete [] col;
+  delete [] val;
+  delete [] rowOff;
+  delete [] nnzInRow;
+  delete [] Count;
+  delete [] qt_matrixValues;
+  delete [] qt_mtxIndl;
+  delete [] qt_rowOffset;
+  delete [] q_mtxIndl;
+  delete [] q_rowOffset;
+  
 
   HPCG_Finalize();
 

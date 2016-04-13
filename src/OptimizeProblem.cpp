@@ -20,8 +20,30 @@
 
 #include "OptimizeProblem.hpp"
 #include <iostream>
+
+#include <CL/cl.hpp>
+#include "clSPARSE.h"
+#include "clSPARSE-error.h"
+
 using namespace std;
-int row ;
+int row;
+
+int call_count;
+float *val, *qt_matrixValues;
+int *col, *rowOff, *nnzInRow, *Count;
+local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+
+cl_platform_id *platform;
+cl_context context;
+cl_device_id *device;
+cl_command_queue command_queue;
+cl_int err;
+cl_int cl_status;
+
+clsparseCreateResult createResult;
+clsparseStatus status;
+clsparseCsrMatrix d_A, d_Q, d_Qt, d_A_ref;
+
 /*!
   Optimizes the data structures used for CG iteration to increase the
   performance of the benchmark version of the preconditioned CG algorithm.
@@ -35,6 +57,117 @@ int row ;
   @see GenerateGeometry
   @see GenerateProblem
 */
+
+int opencl_setup()
+{
+  cl_uint ret_num_of_platforms = 0;
+  cl_int err = clGetPlatformIDs(0, NULL, &ret_num_of_platforms);
+  assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
+
+  platform = (cl_platform_id*)malloc(ret_num_of_platforms * sizeof(cl_platform_id));
+  err = clGetPlatformIDs(ret_num_of_platforms, platform, 0);
+  assert(err == CL_SUCCESS && "clGetPlatformIDs\n");
+
+  cl_uint ret_num_of_devices = 0;
+  err = clGetDeviceIDs(platform[0], CL_DEVICE_TYPE_GPU, 0, NULL, &ret_num_of_devices);
+   
+  assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
+
+  device = (cl_device_id*)malloc(ret_num_of_devices * sizeof(cl_device_id));
+  err = clGetDeviceIDs(platform[0],CL_DEVICE_TYPE_GPU , ret_num_of_devices, device, 0);
+  assert(err == CL_SUCCESS && "clGetDeviceIds failed\n");
+
+  cl_context_properties property[] = {
+                             	CL_CONTEXT_PLATFORM,
+                        (cl_context_properties)(platform[0]),
+                        0};
+
+  context = clCreateContext(property, ret_num_of_devices, &device[0], NULL, NULL, &err);
+  assert(err == CL_SUCCESS && "clCreateContext failed\n");
+
+  command_queue = clCreateCommandQueue(context, device[0], 0, &err);
+  assert(err == CL_SUCCESS && "clCreateCommandQueue failed \n");
+  
+  return 0;
+}
+
+int clsparse_setup()
+{
+  status = clsparseSetup();
+  if (status != clsparseSuccess)
+  {
+      std::cout << "Problem with executing clsparseSetup()" << std::endl;
+      return -3;
+  }
+
+  // Create clsparseControl object
+  createResult = clsparseCreateControl(command_queue);
+  CLSPARSE_V( createResult.status, "Failed to create clsparse control" );
+  
+  clsparseInitCsrMatrix(&d_A);
+  clsparseInitCsrMatrix(&d_Q);
+  clsparseInitCsrMatrix(&d_Qt);
+  clsparseInitCsrMatrix(&d_A_ref); 
+  
+  return 0;
+}
+
+int mem_alloc(SparseMatrix A)
+{
+  val = new float[A.totalNumberOfNonzeros];
+  col = new int[A.totalNumberOfNonzeros];
+  rowOff = new int[A.localNumberOfRows + 1];  
+  
+  nnzInRow = new int[A.localNumberOfRows]();
+  Count = new int[A.localNumberOfRows]();
+  
+  qt_matrixValues = new float[A.localNumberOfRows];
+  qt_mtxIndl = new local_int_t[A.localNumberOfRows];
+  qt_rowOffset = new local_int_t[A.localNumberOfRows + 1];
+  q_mtxIndl = new local_int_t[A.localNumberOfRows];
+  q_rowOffset = new local_int_t[A.localNumberOfRows + 1];
+  
+  d_A.values = clCreateBuffer( context, CL_MEM_READ_ONLY,
+                               d_A.num_nonzeros * sizeof( float ), NULL, &cl_status );
+  
+  d_A.col_indices = clCreateBuffer( context, CL_MEM_READ_ONLY,
+                                   d_A.num_nonzeros * sizeof( clsparseIdx_t ),NULL, &cl_status );
+
+  d_A.row_pointer = clCreateBuffer( context, CL_MEM_READ_ONLY,
+                                   ( d_A.num_rows + 1 ) * sizeof( clsparseIdx_t ),NULL, &cl_status );  
+     
+  
+  d_Qt.values = clCreateBuffer( context, CL_MEM_READ_WRITE,
+                               d_Qt.num_nonzeros * sizeof( float ), NULL, &cl_status );
+  
+  d_Qt.col_indices = clCreateBuffer( context, CL_MEM_READ_WRITE,
+                                   d_Qt.num_nonzeros * sizeof( clsparseIdx_t ), NULL, &cl_status );
+
+  d_Qt.row_pointer = clCreateBuffer( context, CL_MEM_READ_WRITE,
+                                   ( d_Qt.num_rows + 1 ) * sizeof( clsparseIdx_t ), NULL, &cl_status );  
+                                   
+  
+  d_Q.values = clCreateBuffer( context, CL_MEM_READ_ONLY,
+                               d_Q.num_nonzeros * sizeof( float ), NULL, &cl_status );
+  
+  d_Q.col_indices = clCreateBuffer( context, CL_MEM_READ_ONLY,
+                                   d_Q.num_nonzeros * sizeof( clsparseIdx_t ), NULL, &cl_status );
+
+  d_Q.row_pointer = clCreateBuffer( context, CL_MEM_READ_ONLY,
+                                   ( d_Q.num_rows + 1 ) * sizeof( clsparseIdx_t ), NULL, &cl_status ); 
+                                
+                                   
+  d_A_ref.values = clCreateBuffer( context, CL_MEM_READ_WRITE,
+                               d_A_ref.num_nonzeros * sizeof( float ), NULL, &cl_status );
+  
+  d_A_ref.col_indices = clCreateBuffer( context, CL_MEM_READ_WRITE,
+                                   d_A_ref.num_nonzeros * sizeof( clsparseIdx_t ), NULL, &cl_status );
+
+  d_A_ref.row_pointer = clCreateBuffer( context, CL_MEM_READ_WRITE,
+                                   ( d_A_ref.num_rows + 1 ) * sizeof( clsparseIdx_t ), NULL, &cl_status );       
+  
+  return 0;
+}
 
 // free the reference matrix
 void free_refmatrix_m(SparseMatrix &A)
@@ -168,26 +301,183 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   for(int i = 0; i < nrow; i++)
     A_ref.colors[i] = colors[i];
 
+  // declare and allocate qt sparse matrix to be used in CSR format
+  float * qt_matrixValues = new float[nrow];
+  local_int_t * qt_mtxIndl = new local_int_t[nrow];
+  local_int_t * qt_rowOffset = new local_int_t[nrow + 1];
+
+  // declare and allocate q sparse matrix to be used in CSR format
+  local_int_t * q_mtxIndl = new local_int_t[nrow];
+  local_int_t * q_rowOffset = new local_int_t[nrow + 1];
+
+  // Generating qt based on the reordering order
+  int indx = 0;
+  qt_rowOffset[0] = 0;
+  for(int i = 0; i < nrow; i++)
+  {
+    for(int j = 0; j < nrow; j++)
+    {
+      if(A_ref.colors[i] == j)
+      {
+        qt_matrixValues[indx] = 1;
+        qt_mtxIndl[indx++] = j;
+        qt_rowOffset[indx] = qt_rowOffset[indx - 1] + 1;
+        break;
+      }
+    }
+  }
+
+
+
+
+/*
+  
+  // take transpose for qt such that " q = transpose(qt)"
+
+  // convert A matrix to CSR format
+
+  // Perform the multiplication A_ref = qt * A * q
+
+  // convert A_ref to ELL format and save matrix values to A_ref.matrixValues 
+     and col indices to A_ref.mtxIndl
+
+*/
+
+  
+  /* Opencl and clSPARSE setup */
+  if (!call_count)
+  {
+    opencl_setup();
+    clsparse_setup();
+  }
+
+  d_A.num_nonzeros = A.totalNumberOfNonzeros;
+  d_A.num_rows = A.localNumberOfRows;
+  d_A.num_cols = A.localNumberOfColumns;  
+  
+  d_Qt.num_nonzeros = nrow;
+  d_Qt.num_rows = A.localNumberOfRows;
+  d_Qt.num_cols = A.localNumberOfColumns; 
+  
+  d_Q.num_nonzeros = nrow;
+  d_Q.num_rows = A.localNumberOfRows;
+  d_Q.num_cols = A.localNumberOfColumns;     
+  
+  d_A_ref.num_nonzeros = A_ref.totalNumberOfNonzeros;
+  d_A_ref.num_rows = A_ref.localNumberOfRows;
+  d_A_ref.num_cols = A_ref.localNumberOfColumns;     
+  
+  if (call_count)
+  {
+    for(int i = 0; i < nrow; i++)
+      nnzInRow[i] = Count[i] = 0;
+  }
+  
+  if (!call_count)
+  {
+    mem_alloc(A);
+    ++call_count;
+  }
+
+
+  /* Transpose */  
+ 
+  for(int i = 0; i < nrow; i++)
+    nnzInRow[qt_mtxIndl[i]] += 1;
+    
+  q_rowOffset[0] = 0;
+  for(int i = 1; i <= nrow; i++)
+     q_rowOffset[i] =  q_rowOffset[i - 1] + nnzInRow[i - 1];
+    
+  for(int i = 0; i < nrow; i++)
+  {
+    q_mtxIndl[ q_rowOffset[qt_mtxIndl[i]] + Count[qt_mtxIndl[i]]] = i;
+    Count[qt_mtxIndl[i]]++;
+  }
+  
+  
+  
+  /* CSR Matrix */  
+  /* A */  
+  k = 0;
+  rowOff[0] = 0;
+  for(int i = 1; i <= A.totalNumberOfRows; i++)
+    rowOff[i] = rowOff[i - 1] + A.nonzerosInRow[i - 1];
+    
+  for(int i = 0; i < A.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < A.nonzerosInRow[i]; j++)
+     {
+       col[k] = A.mtxIndL[i][j];
+       k++;
+     }
+  }       
+  
+  k = 0;
+  for(int i = 0; i < A.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < A.nonzerosInRow[i]; j++)
+     {
+       val[k] = (float)A.matrixValues[i][j];
+       k++;
+     }
+  }            
+               
+  clEnqueueWriteBuffer(command_queue, d_A.values, CL_TRUE, 0,
+                              d_A.num_nonzeros * sizeof( float ), val, 0, NULL, NULL ); 
+  clEnqueueWriteBuffer(command_queue, d_A.col_indices, CL_TRUE, 0,
+                              d_A.num_nonzeros * sizeof( clsparseIdx_t ), col, 0, NULL, NULL ); 
+  clEnqueueWriteBuffer(command_queue, d_A.row_pointer, CL_TRUE, 0,
+                              (d_A.num_rows + 1) * sizeof( clsparseIdx_t ), rowOff, 0, NULL, NULL );  
+                              
+  /* Qt */
+  clEnqueueWriteBuffer(command_queue, d_Qt.values, CL_TRUE, 0,
+                              d_Qt.num_nonzeros * sizeof( float ), qt_matrixValues, 0, NULL, NULL ); 
+  clEnqueueWriteBuffer(command_queue, d_Qt.col_indices, CL_TRUE, 0,
+                              d_Qt.num_nonzeros * sizeof( clsparseIdx_t ), qt_mtxIndl, 0, NULL, NULL ); 
+  clEnqueueWriteBuffer(command_queue, d_Qt.row_pointer, CL_TRUE, 0,
+                              (d_Qt.num_rows + 1) * sizeof( clsparseIdx_t ), qt_rowOffset, 0, NULL, NULL );                                                                                                                    
+            
+  /* Q */
+  clEnqueueWriteBuffer(command_queue, d_Q.values, CL_TRUE, 0,
+                              d_Q.num_nonzeros * sizeof( float ), qt_matrixValues, 0, NULL, NULL ); 
+  clEnqueueWriteBuffer(command_queue, d_Q.col_indices, CL_TRUE, 0,
+                              d_Q.num_nonzeros * sizeof( clsparseIdx_t ), q_mtxIndl, 0, NULL, NULL ); 
+  clEnqueueWriteBuffer(command_queue, d_Q.row_pointer, CL_TRUE, 0,
+                              (d_Q.num_rows + 1) * sizeof( clsparseIdx_t ), q_rowOffset, 0, NULL, NULL );             
+                                
+  /* clSPARSE matrix-matrix multiplication */
+  clsparseScsrSpGemm(&d_Qt, &d_A, &d_A_ref, createResult.control);
+  clsparseScsrSpGemm(&d_A_ref, &d_Q, &d_A_ref, createResult.control);
+
+  /* Copy back the result */ 
+  clEnqueueReadBuffer(command_queue, d_A_ref.values, CL_TRUE, 0,
+                              d_A_ref.num_nonzeros * sizeof(float), val, 0, NULL, NULL );
+                                                                                                                                     
+  clEnqueueReadBuffer(command_queue, d_A_ref.col_indices, CL_TRUE, 0,
+                              d_A_ref.num_nonzeros * sizeof(clsparseIdx_t ), col, 0, NULL, NULL );    
+                                                               
+  
   // Rearranges the reference matrix according to the coloring index.
   #ifndef HPCG_NO_OPENMP
     #pragma omp parallel for
   #endif
-for(int i = 0; i < nrow; i++)
+  for(int i = 0; i < nrow; i++)
   {   
-	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
+	   //const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
      A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
-	   const double * const currentValues = A.matrixValues[A_ref.colors[i]];
-	   const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
+	   //const double * const currentValues = A.matrixValues[A_ref.colors[i]];
+	   //const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
 
-	   double * diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
-	   A_ref.matrixDiagonal[i] = diagonalValue;
+	   //double * diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
+	   A_ref.matrixDiagonal[i] = A.matrixDiagonal[A_ref.colors[i]];
   
 		//rearrange the elements in the row
-     int col_indx = 0;
+     /*int col_indx = 0;
      #ifndef HPCG_NO_OPENMP
       #pragma omp parallel for
-     #endif
-     for(int k = 0; k < nrow; k++)
+     #endif*/
+     /*for(int k = 0; k < nrow; k++)
      {
 	      for(int j = 0; j < currentNumberOfNonzeros; j++)
 	      {		
@@ -198,9 +488,31 @@ for(int i = 0; i < nrow; i++)
 			        break;
    	       }	
         }
-     }
+     }*/
   }
  
+ 
+  /* Copy back A_ref values and col indices */
+  k = 0;
+  for(int i = 0; i < A_ref.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < A_ref.nonzerosInRow[i]; j++)
+     {
+       A_ref.matrixValues[i][j] = (double)val[k];
+       k++;
+     }
+  }  
+  
+  k = 0;
+  for(int i = 0; i < A_ref.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < A_ref.nonzerosInRow[i]; j++)
+     {
+       A_ref.mtxIndL[i][j] = col[k];
+       k++;
+     }
+  }          
+  
   delete [] row_offset;
   delete [] col_index;
   delete [] random;
