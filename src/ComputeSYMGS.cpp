@@ -97,7 +97,7 @@ static void ComputeSYMGS_OCL(const SparseMatrix &A, const Vector &r, Vector &x) 
                        (void *)r.values,
                        0, NULL, NULL);
 
-  cl_kernel kernel = HPCG_OCL::OCL::getOpenCL()->getKernel_SYMGS();
+  cl_kernel kernel = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("SYMGS"));
   clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&A.clMatrixValues);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&A.clMtxIndL);
   clSetKernelArg(kernel, 2, sizeof(cl_mem), (void *)&A.clNonzerosInRow);

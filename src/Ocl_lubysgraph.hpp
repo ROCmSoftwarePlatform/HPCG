@@ -141,7 +141,7 @@ void ReadBuffer(std::vector<local_int_t> &iColors, cl_mem clBuf) {
 
 void ExecuteKernel(int c, int row_size, cl_mem clMemColors) {
   cl_int cl_status = CL_SUCCESS;
-  cl_kernel kernel = HPCG_OCL::OCL::getOpenCL()->getKernel_lubys_graph();
+  cl_kernel kernel = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("lubys_graph"));
   cl_int c1 = c;
   clSetKernelArg(kernel, 0, sizeof(cl_int), (void *)&c1);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&clRow_offset);

@@ -164,9 +164,9 @@ int clsparse_setup(const SparseMatrix h_A)
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Alpha);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minusAlpha);
 
-  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel_rtzCopy();
-  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeBeta();
-  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeAlpha();
+  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("rtzCopy"));
+  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
+  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
 
   // Set the arguments to our compute kernel
   err  = clSetKernelArg(kernel1, 0, sizeof(cl_mem), &d_rtz.value);
@@ -260,10 +260,10 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
   normr0 = normr;
 
   // Start iterations
-  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel_rtzCopy();
-  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeBeta();
-  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel_computeAlpha();
 
+  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("rtzCopy"));
+  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
+  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
 
   for (int k=1; k<=max_iter && normr/normr0 > tolerance; k++ ) {
     TICK();

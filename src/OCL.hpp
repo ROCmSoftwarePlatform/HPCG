@@ -6,6 +6,8 @@
 #include "SparseMatrix.hpp"
 #include <CL/cl.hpp>
 #include "clSPARSE.h"
+#include <map>
+#include <string>
 
 namespace HPCG_OCL {
 
@@ -18,11 +20,7 @@ public:
   cl_program getProgram(void);
   cl_command_queue getCommandQueue(void);
   int initBuffer(SparseMatrix &A, SparseMatrix &A_ref);
-  cl_kernel getKernel_SYMGS();
-  cl_kernel getKernel_lubys_graph();
-  cl_kernel getKernel_rtzCopy();
-  cl_kernel getKernel_computeBeta();
-  cl_kernel getKernel_computeAlpha();
+  cl_kernel getKernel(std::string);
   int clsparse_initCsrMatrix(const SparseMatrix h_A, clsparseCsrMatrix &d_A, int *col, int *rowoff);
   int clsparse_initDenseVector(cldenseVector &d_, int num_rows);
   int clsparse_initScalar(clsparseScalar &d_);
@@ -39,11 +37,7 @@ private:
   cl_context context;
   cl_program program;
   cl_command_queue command_queue;
-  cl_kernel  kernel_SYMGS;
-  cl_kernel  kernel_lubys_graph;
-  cl_kernel  kernel_rtzCopy;
-  cl_kernel  kernel_computeBeta;
-  cl_kernel  kernel_computeAlpha;
+  std::map<std::string, cl_kernel> kernels;
 };
 
 }
