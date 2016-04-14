@@ -47,7 +47,6 @@ using std::endl;
 #include "OCL.hpp"
 
 extern clsparseCsrMatrix d_A;
-extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
 extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
 extern int *col, *rowoff;
 extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
@@ -106,33 +105,33 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
                        d_A.num_nonzeros * sizeof(double), A.val, 0, NULL, NULL);
 
   // Next, compute x'*A*y
-  ComputeDotProduct(d_p, d_p, d_rtz, t4, A.createResult);
-  int ierr = ComputeSPMV(d_A, d_p, d_Ap, d_alpha, d_beta, A.createResult); // z_nrow = A*y_overlap
+  ComputeDotProduct(A.d_p, A.d_p, d_rtz, t4, A.createResult);
+  int ierr = ComputeSPMV(d_A, A.d_p, A.d_Ap, d_alpha, d_beta, A.createResult); // z_nrow = A*y_overlap
   if (ierr) {
     HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
   }
   double xtAy = 0.0;
-  ierr = ComputeDotProduct(d_b, d_Ap, d_oldrtz, t4, A.createResult); // x'*A*y
+  ierr = ComputeDotProduct(A.d_b, A.d_Ap, d_oldrtz, t4, A.createResult); // x'*A*y
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
 
   // Next, compute y'*A*x
-  ComputeDotProduct(d_b, d_b, d_Beta, t4, A.createResult);
-  ierr = ComputeSPMV(d_A, d_b, d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
+  ComputeDotProduct(A.d_b, A.d_b, d_Beta, t4, A.createResult);
+  ierr = ComputeSPMV(d_A, A.d_b, A.d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
   if (ierr) {
     HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
   }
   double ytAx = 0.0;
-  ierr = ComputeDotProduct(d_p, d_Ap, d_Alpha, t4, A.createResult); // y'*A*x
+  ierr = ComputeDotProduct(A.d_p, A.d_Ap, d_Alpha, t4, A.createResult); // y'*A*x
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
 
-  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_p.values, CL_TRUE, 0,
-                      d_p.num_values * sizeof(double), y_ncol.values, 0, NULL, NULL);
-  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                      d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_p.values, CL_TRUE, 0,
+                      A.d_p.num_values * sizeof(double), y_ncol.values, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_Ap.values, CL_TRUE, 0,
+                      A.d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
   clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Beta.value, CL_TRUE, 0,
                       sizeof(double), &xNorm2, 0, NULL, NULL);
   clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_rtz.value, CL_TRUE, 0,
@@ -160,16 +159,16 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   }
   double xtMinvy = 0.0;
 
-  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                       d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_Ap.values, CL_TRUE, 0,
+                       A.d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
 
-  ierr = ComputeDotProduct(d_b, d_Ap, d_minusAlpha, t4, A.createResult); // x'*Minv*y
+  ierr = ComputeDotProduct(A.d_b, A.d_Ap, d_minusAlpha, t4, A.createResult); // x'*Minv*y
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
 
-  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
-                      d_b.num_values * sizeof(double), x_ncol.values, 0, NULL, NULL);
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_b.values, CL_TRUE, 0,
+                      A.d_b.num_values * sizeof(double), x_ncol.values, 0, NULL, NULL);
 
   // Next, compute z'*Minv*x
   ierr = ComputeMG(A, A_ref, x_ncol, z_ncol); // z_ncol = Minv*x_ncol
@@ -179,10 +178,10 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   }
   double ytMinvx = 0.0;
 
-  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                       d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_Ap.values, CL_TRUE, 0,
+                       A.d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
 
-  ierr = ComputeDotProduct(d_p, d_Ap, d_pAp, t4, A.createResult); // y'*Minv*x
+  ierr = ComputeDotProduct(A.d_p, A.d_Ap, d_pAp, t4, A.createResult); // y'*Minv*x
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
@@ -203,19 +202,19 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
 
   CopyVector(xexact, x_ncol); // Copy exact answer into overlap vector
 
-  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
-                       d_b.num_values * sizeof(double), x_ncol.values, 0, NULL, NULL);
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_b.values, CL_TRUE, 0,
+                       A.d_b.num_values * sizeof(double), x_ncol.values, 0, NULL, NULL);
 
   int numberOfCalls = 2;
   double residual = 0.0;
   for (int i = 0; i < numberOfCalls; ++i) {
-    ierr = ComputeSPMV(d_A, d_b, d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
+    ierr = ComputeSPMV(d_A, A.d_b, A.d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
     if (ierr) {
       HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
     }
 
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
-                        d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_Ap.values, CL_TRUE, 0,
+                        A.d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
 
     if ((ierr = ComputeResidual(A.localNumberOfRows, b, z_ncol, residual))) {
       HPCG_fout << "Error in call to compute_residual: " << ierr << ".\n" << endl;

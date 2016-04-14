@@ -72,7 +72,6 @@ using std::endl;
 
 
 //===extern clsparseCsrMatrix d_A;
-extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
 extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
 extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
 
@@ -467,11 +466,6 @@ int main(int argc, char *argv[]) {
   clReleaseMemObject(d_A.col_indices);
   clReleaseMemObject(d_A.row_pointer);
   clReleaseMemObject(d_A.values);
-  clReleaseMemObject(d_p.values);
-  clReleaseMemObject(d_Ap.values);
-  clReleaseMemObject(d_b.values);
-  clReleaseMemObject(d_r.values);
-  clReleaseMemObject(d_x.values);
 
   delete [] fval;
   delete [] fcol;
