@@ -49,10 +49,8 @@ using std::endl;
 extern clsparseCsrMatrix d_A;
 extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
 extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
-extern double *val;
 extern int *col, *rowoff;
 extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
-extern clsparseCreateResult createResult;
 
 /*!
   Tests symmetry-preserving properties of the sparse matrix vector multiply and
@@ -99,34 +97,34 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   int k = 0;
   for (int i = 0; i < A.totalNumberOfRows; i++) {
     for (int j = 0; j < A.nonzerosInRow[i]; j++) {
-      val[k] = A.matrixValues[i][j];
+      A.val[k] = A.matrixValues[i][j];
       k++;
     }
   }
 
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A.values, CL_TRUE, 0,
-                       d_A.num_nonzeros * sizeof(double), val, 0, NULL, NULL);
+                       d_A.num_nonzeros * sizeof(double), A.val, 0, NULL, NULL);
 
   // Next, compute x'*A*y
-  ComputeDotProduct(d_p, d_p, d_rtz, t4, createResult);
-  int ierr = ComputeSPMV(d_A, d_p, d_Ap, d_alpha, d_beta, createResult); // z_nrow = A*y_overlap
+  ComputeDotProduct(d_p, d_p, d_rtz, t4, A.createResult);
+  int ierr = ComputeSPMV(d_A, d_p, d_Ap, d_alpha, d_beta, A.createResult); // z_nrow = A*y_overlap
   if (ierr) {
     HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
   }
   double xtAy = 0.0;
-  ierr = ComputeDotProduct(d_b, d_Ap, d_oldrtz, t4, createResult); // x'*A*y
+  ierr = ComputeDotProduct(d_b, d_Ap, d_oldrtz, t4, A.createResult); // x'*A*y
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
 
   // Next, compute y'*A*x
-  ComputeDotProduct(d_b, d_b, d_Beta, t4, createResult);
-  ierr = ComputeSPMV(d_A, d_b, d_Ap, d_alpha, d_beta, createResult); // b_computed = A*x_overlap
+  ComputeDotProduct(d_b, d_b, d_Beta, t4, A.createResult);
+  ierr = ComputeSPMV(d_A, d_b, d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
   if (ierr) {
     HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
   }
   double ytAx = 0.0;
-  ierr = ComputeDotProduct(d_p, d_Ap, d_Alpha, t4, createResult); // y'*A*x
+  ierr = ComputeDotProduct(d_p, d_Ap, d_Alpha, t4, A.createResult); // y'*A*x
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
@@ -165,7 +163,7 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
                        d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
 
-  ierr = ComputeDotProduct(d_b, d_Ap, d_minusAlpha, t4, createResult); // x'*Minv*y
+  ierr = ComputeDotProduct(d_b, d_Ap, d_minusAlpha, t4, A.createResult); // x'*Minv*y
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
@@ -184,7 +182,7 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Ap.values, CL_TRUE, 0,
                        d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
 
-  ierr = ComputeDotProduct(d_p, d_Ap, d_pAp, t4, createResult); // y'*Minv*x
+  ierr = ComputeDotProduct(d_p, d_Ap, d_pAp, t4, A.createResult); // y'*Minv*x
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
@@ -211,7 +209,7 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   int numberOfCalls = 2;
   double residual = 0.0;
   for (int i = 0; i < numberOfCalls; ++i) {
-    ierr = ComputeSPMV(d_A, d_b, d_Ap, d_alpha, d_beta, createResult); // b_computed = A*x_overlap
+    ierr = ComputeSPMV(d_A, d_b, d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
     if (ierr) {
       HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
     }

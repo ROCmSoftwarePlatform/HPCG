@@ -27,6 +27,8 @@
 #include "Geometry.hpp"
 #include "Vector.hpp"
 #include "MGData.hpp"
+#include "clSPARSE.h"
+#include "clSPARSE-error.h"
 
 #ifdef __OCL__
 #include <CL/cl.hpp>
@@ -72,6 +74,9 @@ struct SparseMatrix_STRUCT {
   double * sendBuffer; //!< send buffer for non-blocking sends
 
 #endif
+
+  double *val;
+  clsparseCreateResult createResult;
 
 #ifdef __OCL__
 cl_mem  clMatrixValues;
@@ -122,6 +127,7 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.sendBuffer = 0;
 #endif
 
+  A.val = NULL;
 #ifdef __OCL__
   A.clMatrixValues = NULL;
   A.clMtxIndL = NULL;
