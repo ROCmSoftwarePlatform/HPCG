@@ -19,7 +19,7 @@ public:
   cl_device_id getDeviceId(void);
   cl_program getProgram(void);
   cl_command_queue getCommandQueue(void);
-  int initBuffer(SparseMatrix &A, SparseMatrix &A_ref);
+  int initBuffer(SparseMatrix &A);
   cl_kernel getKernel(std::string);
   int clsparse_initCsrMatrix(const SparseMatrix h_A, clsparseCsrMatrix &d_A, int *col, int *rowoff);
   int clsparse_initDenseVector(cldenseVector &d_, int num_rows);

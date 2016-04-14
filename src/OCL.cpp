@@ -120,7 +120,7 @@ void OCL::BuildProgram(void) {
     }
   }
 
-  for(int i = 0; i < sizeof(kernelNames) / sizeof(std::string); ++i) {
+  for (int i = 0; i < sizeof(kernelNames) / sizeof(std::string); ++i) {
     kernels[kernelNames[i]] = clCreateKernel(program, (const char *)kernelNames[i].c_str(), &cl_status);
     if (CL_SUCCESS != cl_status) {
       std::cout << "SYMGSKernel failed. status:" << cl_status << std::endl;
@@ -130,56 +130,60 @@ void OCL::BuildProgram(void) {
 
 }
 
-int OCL::initBuffer(SparseMatrix &A, SparseMatrix &A_ref) {
+int OCL::initBuffer(SparseMatrix &A) {
+  SparseMatrix *Ac_ref = (SparseMatrix *)A.optimizationData;
   int cl_status = CL_SUCCESS;
-  local_int_t nrow = A_ref.localNumberOfRows;
-  A_ref.mtxDiagonal = new double[nrow * 27];
-  A_ref.mtxValue = new double[nrow * 27];
-  A_ref.matrixIndL = new local_int_t[nrow * 27];
-  for (int i = 0; i < nrow; ++i) {
-    memcpy((void *) & (A_ref.mtxDiagonal[i * 27]), (void *)A_ref.matrixDiagonal[i], 27 * sizeof(double));
-    memcpy((void *) & (A_ref.mtxValue[i * 27]), (void *)A_ref.matrixValues[i], 27 * sizeof(double));
-    memcpy((void *) & (A_ref.matrixIndL[i * 27]), (void *)A_ref.mtxIndL[i], 27 * sizeof(local_int_t));
-  }
 
-  A_ref.clMatrixDiagonal = clCreateBuffer(context,
+  for (int idxOfLevels = 0; idxOfLevels < 4; ++idxOfLevels) {
+    SparseMatrix & A_ref = *Ac_ref;
+
+    local_int_t nrow = A_ref.localNumberOfRows;
+    A_ref.mtxDiagonal = new double[nrow * 27];
+    A_ref.mtxValue = new double[nrow * 27];
+    A_ref.matrixIndL = new local_int_t[nrow * 27];
+    for (int i = 0; i < nrow; ++i) {
+      memcpy((void *) & (A_ref.mtxDiagonal[i * 27]), (void *)A_ref.matrixDiagonal[i], 27 * sizeof(double));
+      memcpy((void *) & (A_ref.mtxValue[i * 27]), (void *)A_ref.matrixValues[i], 27 * sizeof(double));
+      memcpy((void *) & (A_ref.matrixIndL[i * 27]), (void *)A_ref.mtxIndL[i], 27 * sizeof(local_int_t));
+    }
+
+    A_ref.clMatrixDiagonal = clCreateBuffer(context,
+                                            CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                            nrow * 27 * sizeof(double),
+                                            A_ref.mtxDiagonal,
+                                            &cl_status);
+    if (CL_SUCCESS != cl_status || NULL == A_ref.clMatrixDiagonal) {
+      std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    }
+
+    A_ref.clMatrixValues = clCreateBuffer(context,
                                           CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
                                           nrow * 27 * sizeof(double),
-                                          A_ref.mtxDiagonal,
+                                          A_ref.mtxValue,
                                           &cl_status);
-  if (CL_SUCCESS != cl_status || NULL == A_ref.clMatrixDiagonal) {
-    std::cout << "create buffer failed. status:" << cl_status << std::endl;
-    return -1;
-  }
+    if (CL_SUCCESS != cl_status || NULL == A_ref.clMatrixValues) {
+      std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    }
 
-  A_ref.clMatrixValues = clCreateBuffer(context,
-                                        CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                        nrow * 27 * sizeof(double),
-                                        A_ref.mtxValue,
-                                        &cl_status);
-  if (CL_SUCCESS != cl_status || NULL == A_ref.clMatrixValues) {
-    std::cout << "create buffer failed. status:" << cl_status << std::endl;
-    return -1;
-  }
+    A_ref.clNonzerosInRow = clCreateBuffer(context,
+                                           CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                           nrow * sizeof(char),
+                                           A_ref.nonzerosInRow,
+                                           &cl_status);
+    if (CL_SUCCESS != cl_status || NULL == A_ref.clNonzerosInRow) {
+      std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    }
 
-  A_ref.clNonzerosInRow = clCreateBuffer(context,
-                                         CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                         nrow * sizeof(char),
-                                         A_ref.nonzerosInRow,
-                                         &cl_status);
-  if (CL_SUCCESS != cl_status || NULL == A_ref.clNonzerosInRow) {
-    std::cout << "create buffer failed. status:" << cl_status << std::endl;
-    return -1;
-  }
+    A_ref.clMtxIndL = clCreateBuffer(context,
+                                     CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                     nrow * 27 * sizeof(local_int_t),
+                                     A_ref.matrixIndL,
+                                     &cl_status);
+    if (CL_SUCCESS != cl_status || NULL == A_ref.clMtxIndL) {
+      std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    }
 
-  A_ref.clMtxIndL = clCreateBuffer(context,
-                                   CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-                                   nrow * 27 * sizeof(local_int_t),
-                                   A_ref.matrixIndL,
-                                   &cl_status);
-  if (CL_SUCCESS != cl_status || NULL == A_ref.clMtxIndL) {
-    std::cout << "create buffer failed. status:" << cl_status << std::endl;
-    return -1;
+    Ac_ref = Ac_ref->Ac;
   }
 
   return 0;
@@ -261,7 +265,7 @@ void OCL::ReleaseOpenCL(void) {
     platform = NULL;
   }
 
-  for (int i = 0; i < sizeof(kernelNames)/sizeof(std::string); ++i) {
+  for (int i = 0; i < sizeof(kernelNames) / sizeof(std::string); ++i) {
     if (NULL != kernels[kernelNames[i]]) {
       clReleaseKernel(kernels[kernelNames[i]]);
       kernels[kernelNames[i]] = NULL;

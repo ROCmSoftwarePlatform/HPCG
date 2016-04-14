@@ -123,7 +123,13 @@ static void lubys_graph_coloring_gpu (int c, int nrow, std::vector<local_int_t> 
 }
 
 
-int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
+int OptimizeProblem(const SparseMatrix * A_) {
+  const SparseMatrix * Ac = A_;
+  SparseMatrix * Ac_ref = (SparseMatrix *)A_->optimizationData;
+  for (int idxOfLevels = 0; idxOfLevels < 4; ++idxOfLevels) {
+
+  const SparseMatrix & A = *Ac;
+  SparseMatrix & A_ref = *Ac_ref;
 
   const local_int_t nrow = A.localNumberOfRows;
   row = nrow;
@@ -270,6 +276,9 @@ for(int i = 0; i < nrow; i++)
   delete [] col_index;
   delete [] random;
 
+  Ac = Ac->Ac;
+  Ac_ref = Ac_ref->Ac;
+  }
   return 0;
 }
 

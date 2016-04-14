@@ -384,16 +384,10 @@ int main(int argc, char *argv[]) {
 
   /* call OptimizeProblem to all grid levels so the reference matrix is reordered
   based on Luby's color reordering algorithm*/
-  OptimizeProblem(A, A_ref);
-  OptimizeProblem(*A.Ac, *A_ref.Ac);
-  OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
-  OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
-
+  A.optimizationData = &A_ref;
+  OptimizeProblem(&A);
 #ifdef __OCL__
-  HPCG_OCL::OCL::getOpenCL()->initBuffer(A, A_ref);
-  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac, *A_ref.Ac);
-  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac->Ac, *A_ref.Ac->Ac);
-  HPCG_OCL::OCL::getOpenCL()->initBuffer(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+  HPCG_OCL::OCL::getOpenCL()->initBuffer(A);
 #endif
 
   t7 = mytimer() - t7;
