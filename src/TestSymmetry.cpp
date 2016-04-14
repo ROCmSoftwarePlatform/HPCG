@@ -46,7 +46,6 @@ using std::endl;
 #include "clSPARSE.h"
 #include "OCL.hpp"
 
-extern clsparseCsrMatrix d_A;
 extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
 extern int *col, *rowoff;
 extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
@@ -101,12 +100,12 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
     }
   }
 
-  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A.values, CL_TRUE, 0,
-                       d_A.num_nonzeros * sizeof(double), A.val, 0, NULL, NULL);
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_A.values, CL_TRUE, 0,
+                       A.d_A.num_nonzeros * sizeof(double), A.val, 0, NULL, NULL);
 
   // Next, compute x'*A*y
   ComputeDotProduct(A.d_p, A.d_p, d_rtz, t4, A.createResult);
-  int ierr = ComputeSPMV(d_A, A.d_p, A.d_Ap, d_alpha, d_beta, A.createResult); // z_nrow = A*y_overlap
+  int ierr = ComputeSPMV(A.d_A, A.d_p, A.d_Ap, d_alpha, d_beta, A.createResult); // z_nrow = A*y_overlap
   if (ierr) {
     HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
   }
@@ -118,7 +117,7 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
 
   // Next, compute y'*A*x
   ComputeDotProduct(A.d_b, A.d_b, d_Beta, t4, A.createResult);
-  ierr = ComputeSPMV(d_A, A.d_b, A.d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
+  ierr = ComputeSPMV(A.d_A, A.d_b, A.d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
   if (ierr) {
     HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
   }
@@ -208,7 +207,7 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   int numberOfCalls = 2;
   double residual = 0.0;
   for (int i = 0; i < numberOfCalls; ++i) {
-    ierr = ComputeSPMV(d_A, A.d_b, A.d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
+    ierr = ComputeSPMV(A.d_A, A.d_b, A.d_Ap, d_alpha, d_beta, A.createResult); // b_computed = A*x_overlap
     if (ierr) {
       HPCG_fout << "Error in call to SpMV: " << ierr << ".\n" << endl;
     }

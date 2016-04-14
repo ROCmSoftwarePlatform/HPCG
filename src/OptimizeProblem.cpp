@@ -33,7 +33,7 @@ extern float *fval, *qt_matrixValues;
 extern int *col, *rowOff, *nnzInRow, *Count;
 extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
 
-extern clsparseCsrMatrix Od_A, d_A, d_Q, d_Qt, d_A_ref;
+extern clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
 
 /*!
   Optimizes the data structures used for CG iteration to increase the

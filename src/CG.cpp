@@ -47,7 +47,7 @@
 #define TICK()  t0 = mytimer() //!< record current time in 't0'
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
 
-clsparseCsrMatrix d_A, Od_A, d_Q, d_Qt, d_A_ref;
+clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
 clsparseScalar d_alpha, d_beta, d_normr, d_minus; 
 clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
   
@@ -92,7 +92,7 @@ int clsparse_setup(SparseMatrix &h_A)
   h_A.createResult = clsparseCreateControl(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
   CLSPARSE_V( h_A.createResult.status, "Failed to create clsparse control" );
   
-  clsparseInitCsrMatrix(&d_A);
+  clsparseInitCsrMatrix(&h_A.d_A);
   clsparseInitCsrMatrix(&Od_A);
   clsparseInitCsrMatrix(&d_Q);
   clsparseInitCsrMatrix(&d_Qt);
@@ -128,12 +128,12 @@ int clsparse_setup(SparseMatrix &h_A)
        k++;
      }
   }             
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, d_A, col, rowOff);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, h_A.d_A, col, rowOff);
                                       
   // This function allocates memory for rowBlocks structure. If not called
   // the structure will not be calculated and clSPARSE will run the vectorized
   // version of SpMV instead of adaptive;
-  clsparseCsrMetaCreate( &d_A, h_A.createResult.control );
+  clsparseCsrMetaCreate( &h_A.d_A, h_A.createResult.control );
   
   clsparseInitVector(&h_A.d_p);
   clsparseInitVector(&h_A.d_Ap);
@@ -152,11 +152,11 @@ int clsparse_setup(SparseMatrix &h_A)
   clsparseInitScalar(&d_Alpha);
   clsparseInitScalar(&d_Beta);
   clsparseInitScalar(&d_minusAlpha);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_p,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_Ap, d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_b,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_r,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_x,  d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_p,  h_A.d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_Ap, h_A.d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_b,  h_A.d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_r,  h_A.d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_x,  h_A.d_A.num_rows);
   
   // d_x.num_values = d_A.num_rows;                
   double one = 1.0;
@@ -240,14 +240,14 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
     }
   }
 
-  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A.values, CL_TRUE, 0,
-                       d_A.num_nonzeros * sizeof(double), A.val, 0, NULL, NULL);
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_A.values, CL_TRUE, 0,
+                       A.d_A.num_nonzeros * sizeof(double), A.val, 0, NULL, NULL);
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_p.values, CL_TRUE, 0,
-                       d_A.num_rows * sizeof(double), p.values, 0, NULL, NULL);
+                       A.d_A.num_rows * sizeof(double), p.values, 0, NULL, NULL);
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_b.values, CL_TRUE, 0,
-                       d_A.num_rows * sizeof(double), b.values, 0, NULL, NULL);
+                       A.d_A.num_rows * sizeof(double), b.values, 0, NULL, NULL);
 
-  TICK(); ComputeSPMV(d_A, A.d_p, A.d_Ap, d_alpha, d_beta, A.createResult); TOCK(t3); // Ap = A*p
+  TICK(); ComputeSPMV(A.d_A, A.d_p, A.d_Ap, d_alpha, d_beta, A.createResult); TOCK(t3); // Ap = A*p
   TICK(); ComputeWAXPBY(d_alpha, A.d_b, d_minus, A.d_Ap, A.d_r, A.createResult);  TOCK(t2); // r = b - Ax (x stored in p)
   TICK(); ComputeDotProduct(A.d_r, A.d_r, d_normr, t4, A.createResult); TOCK(t1);
 
@@ -284,7 +284,7 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
     TOCK(t5); // Preconditioner apply time
 
     clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_b.values, CL_TRUE, 0,
-                         d_A.num_rows * sizeof(double), z.values, 0, NULL, NULL);
+                         A.d_A.num_rows * sizeof(double), z.values, 0, NULL, NULL);
 
     if (k == 1) {
       TICK(); ComputeWAXPBY(d_alpha, A.d_b, d_beta, A.d_b, A.d_p, A.createResult); TOCK(t2); // Copy Mr to p
@@ -303,7 +303,7 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
       TICK(); ComputeWAXPBY(d_alpha, A.d_b, d_Beta, A.d_p, A.d_p, A.createResult);  TOCK(t2); // p = beta*p + z
     }
 
-    TICK(); ComputeSPMV(d_A, A.d_p, A.d_Ap, d_alpha, d_beta, A.createResult); TOCK(t3); // Ap = A*p
+    TICK(); ComputeSPMV(A.d_A, A.d_p, A.d_Ap, d_alpha, d_beta, A.createResult); TOCK(t3); // Ap = A*p
     TICK(); ComputeDotProduct(A.d_p, A.d_Ap, d_pAp, t4, A.createResult); TOCK(t1); // alpha = p'*Ap
 
     //alpha = rtz/pAp;

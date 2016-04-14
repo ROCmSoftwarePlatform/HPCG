@@ -78,6 +78,7 @@ struct SparseMatrix_STRUCT {
   double *val;
   clsparseCreateResult createResult;
   cldenseVector d_p, d_Ap, d_b, d_r, d_x;
+  clsparseCsrMatrix d_A;
 
 #ifdef __OCL__
 cl_mem  clMatrixValues;
@@ -201,6 +202,10 @@ inline void DeleteMatrix(SparseMatrix & A) {
   if (A.Ac!=0) { DeleteMatrix(*A.Ac); delete A.Ac; A.Ac = 0;} // Delete coarse matrix
   if (A.mgData!=0) { DeleteMGData(*A.mgData); delete A.mgData; A.mgData = 0;} // Delete MG data
 
+  clsparseCsrMetaDelete(&A.d_A);
+  clReleaseMemObject(A.d_A.col_indices);
+  clReleaseMemObject(A.d_A.row_pointer);
+  clReleaseMemObject(A.d_A.values);
   clReleaseMemObject(A.d_p.values);
   clReleaseMemObject(A.d_Ap.values);
   clReleaseMemObject(A.d_b.values);
