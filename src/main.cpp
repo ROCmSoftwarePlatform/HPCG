@@ -71,7 +71,6 @@ using std::endl;
 #endif
 
 
-extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
 extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
 
 extern int *fcol, *frowOff;
@@ -451,10 +450,6 @@ int main(int argc, char *argv[]) {
   DeleteVector(b_computed);
   delete [] testnorms_data.values;
 
-  clReleaseMemObject(d_alpha.value);
-  clReleaseMemObject(d_beta.value);
-  clReleaseMemObject(d_normr.value);
-  clReleaseMemObject(d_minus.value);
   clReleaseMemObject(d_rtz.value);
   clReleaseMemObject(d_oldrtz.value);
   clReleaseMemObject(d_pAp.value);
