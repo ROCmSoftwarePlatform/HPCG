@@ -444,20 +444,6 @@ int main(int argc, char *argv[]) {
 
   // Clean up
   free_refmatrix_m(A_ref);
-  /** Close & release resources */
-  clsparseStatus status = clsparseReleaseControl(A.createResult.control);
-  if (status != clsparseSuccess) {
-    std::cout << "Problem with releasing control object."
-              << " Error: " << status << std::endl;
-  }
-
-  status = clsparseTeardown();
-
-  if (status != clsparseSuccess) {
-    std::cout << "Problem with closing clSPARSE library."
-              << " Error: " << status << std::endl;
-  }
-
   DeleteMatrix(A); // This delete will recursively delete all coarse grid data
   DeleteCGData(data);
   DeleteVector(x);
@@ -506,7 +492,14 @@ int main(int argc, char *argv[]) {
   clReleaseMemObject ( d_A_ref.col_indices );
   clReleaseMemObject ( d_A_ref.row_pointer );
   clReleaseMemObject ( d_A_ref.values );
-  
+
+  /** Close & release resources */
+  clsparseStatus status = clsparseTeardown();
+  if (status != clsparseSuccess) {
+    std::cout << "Problem with closing clSPARSE library."
+              << " Error: " << status << std::endl;
+  }
+
   delete [] col;
   delete [] rowOff;
   delete [] nnzInRow;
