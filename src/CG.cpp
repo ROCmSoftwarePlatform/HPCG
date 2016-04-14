@@ -47,6 +47,27 @@
 #define TICK()  t0 = mytimer() //!< record current time in 't0'
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
 
+cl_int err;
+cl_int cl_status;
+
+clsparseCreateResult createResult;
+clsparseStatus status;
+clsparseCsrMatrix d_A;
+cldenseVector d_p, d_Ap, d_b, d_r, d_x;
+clsparseScalar d_alpha, d_beta, d_normr, d_minus; 
+  
+double *val;
+int *fcol, *frowOff;
+
+clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
+
+int call_count;
+float *fval, *qt_matrixValues;
+int *col, *rowOff, *nnzInRow, *Count;
+local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+
+clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
+
 /*!
   Routine to compute an approximate solution to Ax = b
 
@@ -68,12 +89,126 @@
   @see CG_ref()
 */
 
-extern double *val;
-extern clsparseCsrMatrix d_A;
-extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
-extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
-extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
-extern clsparseCreateResult createResult;
+int count_cg;
+
+int clsparse_setup(const SparseMatrix h_A)
+{
+  status = clsparseSetup();
+  if (status != clsparseSuccess)
+  {
+      std::cout << "Problem with executing clsparseSetup()" << std::endl;
+      return -3;
+  }
+
+  // Create clsparseControl object
+  createResult = clsparseCreateControl(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
+  CLSPARSE_V( createResult.status, "Failed to create clsparse control" );
+  
+  clsparseInitCsrMatrix(&d_A);
+  clsparseInitCsrMatrix(&Od_A);
+  clsparseInitCsrMatrix(&d_Q);
+  clsparseInitCsrMatrix(&d_Qt);
+  clsparseInitCsrMatrix(&d_A_ref);
+
+  fval = new float[h_A.totalNumberOfNonzeros];
+  fcol = new int[h_A.totalNumberOfNonzeros];
+  frowOff = new int[h_A.localNumberOfRows + 1];
+
+  val = new double[h_A.totalNumberOfNonzeros];
+  col = new int[h_A.totalNumberOfNonzeros];
+  rowOff = new int[h_A.localNumberOfRows + 1];
+  ///////////////////////////////////
+  nnzInRow = new int[h_A.localNumberOfRows]();
+  Count = new int[h_A.localNumberOfRows]();
+
+  qt_matrixValues = new float[h_A.localNumberOfRows];
+  qt_mtxIndl = new local_int_t[h_A.localNumberOfRows];
+  qt_rowOffset = new local_int_t[h_A.localNumberOfRows + 1];
+  q_mtxIndl = new local_int_t[h_A.localNumberOfRows];
+  q_rowOffset = new local_int_t[h_A.localNumberOfRows + 1];
+  ///////////////////////////////////
+  int k = 0;
+  rowOff[0] = 0;
+  for(int i = 1; i <= h_A.totalNumberOfRows; i++)
+    rowOff[i] = rowOff[i - 1] + h_A.nonzerosInRow[i - 1];
+    
+  for(int i = 0; i < h_A.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < h_A.nonzerosInRow[i]; j++)
+     {
+       col[k] = h_A.mtxIndL[i][j];
+       k++;
+     }
+  }             
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, d_A, col, rowOff);
+                                      
+  // This function allocates memory for rowBlocks structure. If not called
+  // the structure will not be calculated and clSPARSE will run the vectorized
+  // version of SpMV instead of adaptive;
+  clsparseCsrMetaCreate( &d_A, createResult.control );
+  
+  clsparseInitVector(&d_p);
+  clsparseInitVector(&d_Ap);
+  clsparseInitVector(&d_b);
+  clsparseInitVector(&d_r);
+  clsparseInitVector(&d_x);
+  
+  clsparseInitScalar(&d_alpha);
+  clsparseInitScalar(&d_beta);
+  clsparseInitScalar(&d_normr);
+  clsparseInitScalar(&d_minus);
+  
+  clsparseInitScalar(&d_rtz);
+  clsparseInitScalar(&d_oldrtz);
+  clsparseInitScalar(&d_pAp);
+  clsparseInitScalar(&d_Alpha);
+  clsparseInitScalar(&d_Beta);
+  clsparseInitScalar(&d_minusAlpha);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_p,  d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_Ap, d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_b,  d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_r,  d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_x,  d_A.num_rows);
+  
+  // d_x.num_values = d_A.num_rows;                
+  double one = 1.0;
+  double zero = 0.0;
+  double minus = -1.0;
+
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_alpha, one);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_beta,  zero);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minus, minus);
+  
+  // Create the input and output arrays in device memory for our calculation
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_normr);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_rtz);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_oldrtz);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_pAp);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Beta);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Alpha);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minusAlpha);
+
+  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("rtzCopy"));
+  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
+  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
+
+  // Set the arguments to our compute kernel
+  err  = clSetKernelArg(kernel1, 0, sizeof(cl_mem), &d_rtz.value);
+  err |= clSetKernelArg(kernel1, 1, sizeof(cl_mem), &d_oldrtz.value);      
+    
+  // Set the arguments to our compute kernel
+  err  = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &d_rtz.value);
+  err |= clSetKernelArg(kernel2, 1, sizeof(cl_mem), &d_oldrtz.value);
+  err |= clSetKernelArg(kernel2, 2, sizeof(cl_mem), &d_Beta.value);      
+
+  // Set the arguments to our compute kernel
+  err  = clSetKernelArg(kernel3, 0, sizeof(cl_mem), &d_rtz.value);
+  err |= clSetKernelArg(kernel3, 1, sizeof(cl_mem), &d_pAp.value);
+  err |= clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
+  err |= clSetKernelArg(kernel3, 3, sizeof(cl_mem), &d_minusAlpha.value);      
+
+  return 0;
+}
 
 
 int CG(const SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
@@ -86,7 +221,14 @@ int CG(const SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
   double rtz = 0.0, oldrtz = 0.0, alpha = 0.0, beta = 0.0, pAp = 0.0, minusAlpha = 0.0;
   double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0, t4 = 0.0, t5 = 0.0;
   size_t globalSize = 64;
-
+  // static int call_count;
+  
+  if (!call_count) 
+  {  
+    clsparse_setup(A);
+    ++call_count; 
+  } 
+ 
   local_int_t nrow = A.localNumberOfRows;
   Vector &r = data.r;  // Residual vector
   Vector &z = data.z;  // Preconditioned residual vector

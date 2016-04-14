@@ -71,15 +71,21 @@ using std::endl;
 #endif
 
 
-double *val;
-int *col, *rowoff;
-clsparseCsrMatrix d_A;
-cldenseVector d_p, d_Ap, d_b, d_r, d_x;
-clsparseScalar d_alpha, d_beta, d_normr, d_minus;
-clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
-clsparseCreateResult createResult;
+//===extern clsparseCsrMatrix d_A;
+extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
+extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
+extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
+
+extern double *val;
+extern int *fcol, *frowOff;
 
 //extern double spmv_time;
+extern float *fval, *qt_matrixValues;
+extern int *col, *rowOff, *nnzInRow, *Count;
+extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+extern clsparseCsrMatrix Od_A, d_A, d_Q, d_Qt, d_A_ref;
+extern clsparseCreateResult createResult;
+
 
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
@@ -89,110 +95,6 @@ clsparseCreateResult createResult;
 
   @return Returns zero on success and a non-zero value otherwise.
 */
-
-int clsparse_setup(const SparseMatrix h_A) {
-  cl_int err;
-  clsparseStatus status = clsparseSetup();
-  if (status != clsparseSuccess) {
-    std::cout << "Problem with executing clsparseSetup()" << std::endl;
-    return -3;
-  }
-
-  // Create clsparseControl object
-  createResult = clsparseCreateControl(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
-  CLSPARSE_V(createResult.status, "Failed to create clsparse control");
-
-  clsparseInitCsrMatrix(&d_A);
-
-  val = new double[h_A.totalNumberOfNonzeros];
-  col = new int[h_A.totalNumberOfNonzeros];
-  rowoff = new int[h_A.localNumberOfRows + 1];
-
-  int k = 0;
-  rowoff[0] = 0;
-  for (int i = 1; i <= h_A.totalNumberOfRows; i++) {
-    rowoff[i] = rowoff[i - 1] + h_A.nonzerosInRow[i - 1];
-  }
-
-  for (int i = 0; i < h_A.totalNumberOfRows; i++) {
-    for (int j = 0; j < h_A.nonzerosInRow[i]; j++) {
-      col[k] = h_A.mtxIndL[i][j];
-      k++;
-    }
-  }
-
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, d_A, col, rowoff);
-
-  // This function allocates memory for rowBlocks structure. If not called
-  // the structure will not be calculated and clSPARSE will run the vectorized
-  // version of SpMV instead of adaptive;
-  clsparseCsrMetaCreate(&d_A, createResult.control);
-
-  clsparseInitVector(&d_p);
-  clsparseInitVector(&d_Ap);
-  clsparseInitVector(&d_b);
-  clsparseInitVector(&d_r);
-  clsparseInitVector(&d_x);
-
-  clsparseInitScalar(&d_alpha);
-  clsparseInitScalar(&d_beta);
-  clsparseInitScalar(&d_normr);
-  clsparseInitScalar(&d_minus);
-
-  clsparseInitScalar(&d_rtz);
-  clsparseInitScalar(&d_oldrtz);
-  clsparseInitScalar(&d_pAp);
-  clsparseInitScalar(&d_Alpha);
-  clsparseInitScalar(&d_Beta);
-  clsparseInitScalar(&d_minusAlpha);
-
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_p,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_Ap, d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_b,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_r,  d_A.num_rows);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(d_x,  d_A.num_rows);
-
-  // d_x.num_values = d_A.num_rows;
-  double one = 1.0;
-  double zero = 0.0;
-  double minus = -1.0;
-
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_alpha, one);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_beta,  zero);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minus, minus);
-
-  // Create the input and output arrays in device memory for our calculation
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_normr);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_rtz);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_oldrtz);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_pAp);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Beta);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Alpha);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minusAlpha);
-
-  cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("rtzCopy"));
-  cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
-  cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
-
-  // Set the arguments to our compute kernel
-  err  = clSetKernelArg(kernel1, 0, sizeof(cl_mem), &d_rtz.value);
-  err |= clSetKernelArg(kernel1, 1, sizeof(cl_mem), &d_oldrtz.value);
-
-  // Set the arguments to our compute kernel
-  err  = clSetKernelArg(kernel2, 0, sizeof(cl_mem), &d_rtz.value);
-  err |= clSetKernelArg(kernel2, 1, sizeof(cl_mem), &d_oldrtz.value);
-  err |= clSetKernelArg(kernel2, 2, sizeof(cl_mem), &d_Beta.value);
-
-  // Set the arguments to our compute kernel
-  err  = clSetKernelArg(kernel3, 0, sizeof(cl_mem), &d_rtz.value);
-  err |= clSetKernelArg(kernel3, 1, sizeof(cl_mem), &d_pAp.value);
-  err |= clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
-  err |= clSetKernelArg(kernel3, 3, sizeof(cl_mem), &d_minusAlpha.value);
-
-  return 0;
-}
-
-
 
 int main(int argc, char *argv[]) {
 
@@ -404,8 +306,6 @@ int main(int argc, char *argv[]) {
   // Validation Testing Phase //
   //////////////////////////////
 
-  clsparse_setup(A);
-
 #ifdef HPCG_DEBUG
   t1 = mytimer();
 #endif
@@ -587,9 +487,36 @@ int main(int argc, char *argv[]) {
   clReleaseMemObject(d_r.values);
   clReleaseMemObject(d_x.values);
 
-  delete [] val;
+  delete [] fval;
+  delete [] fcol;
+  delete [] frowOff;
+  
+  clReleaseMemObject ( Od_A.col_indices );
+  clReleaseMemObject ( Od_A.row_pointer );
+  clReleaseMemObject ( Od_A.values );
+  
+  clReleaseMemObject ( d_Qt.col_indices );
+  clReleaseMemObject ( d_Qt.row_pointer );
+  clReleaseMemObject ( d_Qt.values );
+  
+  clReleaseMemObject ( d_Q.col_indices );
+  clReleaseMemObject ( d_Q.row_pointer );
+  clReleaseMemObject ( d_Q.values );
+  
+  clReleaseMemObject ( d_A_ref.col_indices );
+  clReleaseMemObject ( d_A_ref.row_pointer );
+  clReleaseMemObject ( d_A_ref.values );
+  
   delete [] col;
-  delete [] rowoff;
+  delete [] val;
+  delete [] rowOff;
+  delete [] nnzInRow;
+  delete [] Count;
+  delete [] qt_matrixValues;
+  delete [] qt_mtxIndl;
+  delete [] qt_rowOffset;
+  delete [] q_mtxIndl;
+  delete [] q_rowOffset;
 
   HPCG_Finalize();
 
