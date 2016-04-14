@@ -74,7 +74,8 @@ extern clsparseCreateResult createResult;
   @see ComputeMG_ref
 */
 
-int TestSymmetry(SparseMatrix &A, SparseMatrix &A_ref, Vector &b, Vector &xexact, TestSymmetryData &testsymmetry_data) {
+int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &testsymmetry_data) {
+  SparseMatrix &A_ref = *(SparseMatrix *)A.optimizationData;
   local_int_t nrow = A.localNumberOfRows;
   local_int_t ncol = A.localNumberOfColumns;
 

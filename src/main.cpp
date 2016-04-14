@@ -274,18 +274,13 @@ int main(int argc, char *argv[]) {
 
   int numberOfMgLevels = 4; // Number of levels including first
   SparseMatrix *curLevelMatrix = &A;
+  SparseMatrix *curLevelMatrix_ref = &A_ref;
   for (int level = 1; level < numberOfMgLevels; ++level) {
     GenerateCoarseProblem(*curLevelMatrix);
     curLevelMatrix = curLevelMatrix->Ac; // Make the just-constructed coarse grid the next level
-  }
-
-  //Allocate and create coarse levels for reference sparse matrix
-  SparseMatrix *curLevelMatrix_ref = &A_ref;
-  for (int level = 1; level < numberOfMgLevels; ++level) {
     GenerateCoarseProblem(*curLevelMatrix_ref);
     curLevelMatrix_ref = curLevelMatrix_ref->Ac; // Make the just-constructed coarse grid the next level
   }
-
 
   setup_time = mytimer() - setup_time; // Capture total time of setup
   times[9] = setup_time; // Save it for reporting
@@ -419,7 +414,7 @@ int main(int argc, char *argv[]) {
   TestCG(A, geom, data, b, x, testcg_data);
 
   TestSymmetryData testsymmetry_data;
-  TestSymmetry(A, A_ref, b, xexact, testsymmetry_data);
+  TestSymmetry(A, b, xexact, testsymmetry_data);
 
 #ifdef HPCG_DEBUG
   if (rank == 0) {
@@ -451,7 +446,7 @@ int main(int argc, char *argv[]) {
   for (int i = 0; i < numberOfCalls; ++i) {
     ZeroVector(x); // start x at all zeros
     double last_cummulative_time = opt_times[0];
-    ierr = CG(A, A_ref, data, b, x, optMaxIters, refTolerance, niters, normr, normr0, &opt_times[0], true);
+    ierr = CG(A, data, b, x, optMaxIters, refTolerance, niters, normr, normr0, &opt_times[0], true);
     if (ierr) {
       ++err_count;  // count the number of errors in CG
     }
@@ -514,7 +509,7 @@ int main(int argc, char *argv[]) {
 
   for (int i = 0; i < numberOfCgSets; ++i) {
     ZeroVector(x); // Zero out x
-    ierr = CG(A, A_ref, data, b, x, optMaxIters, optTolerance, niters, normr, normr0, &times[0], true);
+    ierr = CG(A, data, b, x, optMaxIters, optTolerance, niters, normr, normr0, &times[0], true);
     if (ierr) {
       HPCG_fout << "Error in call to CG: " << ierr << ".\n" << endl;
     }

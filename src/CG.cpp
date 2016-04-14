@@ -76,10 +76,11 @@ extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
 extern clsparseCreateResult createResult;
 
 
-int CG(const SparseMatrix &A, SparseMatrix &A_ref, CGData &data, const Vector &b, Vector &x,
+int CG(const SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
        const int max_iter, const double tolerance, int &niters, double &normr, double &normr0,
        double *times, bool doPreconditioning) {
   cl_int err;
+  SparseMatrix &A_ref = *(SparseMatrix *)A.optimizationData;
   double t_begin = mytimer();  // Start timing right away
   normr = 0.0;
   double rtz = 0.0, oldrtz = 0.0, alpha = 0.0, beta = 0.0, pAp = 0.0, minusAlpha = 0.0;

@@ -115,6 +115,7 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
 
   /* call OptimizeProblem to all grid levels so the reference matrix is reordered
   based on Luby's color reordering algorithm*/
+  void * optimizationData = A.optimizationData;
   A.optimizationData = &A_ref;
   OptimizeProblem(&A);
 #ifdef __OCL__
@@ -127,7 +128,7 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
     for (int i=0; i< numberOfCgCalls; ++i) {
       ZeroVector(x); // Zero out x
 
-      int ierr = CG(A, A_ref, data, b, x, maxIters, tolerance, niters, normr, normr0, &times[0], k==1);
+      int ierr = CG(A, data, b, x, maxIters, tolerance, niters, normr, normr0, &times[0], k==1);
 
       if (ierr) HPCG_fout << "Error in call to CG: " << ierr << ".\n" << endl;
       if (niters <= expected_niters) {
@@ -156,5 +157,7 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
 
   //free the reference sparse matrix
   free_refmatrix_m(A_ref);
+  // Restore old data
+  A.optimizationData = optimizationData;
   return 0;
 }
