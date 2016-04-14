@@ -22,7 +22,27 @@
 #include <iostream>
 #include "Ocl_lubysgraph.hpp"
 using namespace std;
-int row ;
+
+#include <CL/cl.hpp>
+#include "clSPARSE.h"
+#include "clSPARSE-error.h"
+#include "OCL.hpp"
+
+using namespace std;
+int row;
+
+extern int call_count;
+extern int *fcol, *frowOff;
+extern float *fval, *qt_matrixValues;
+extern int *col, *rowOff, *nnzInRow, *Count;
+extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+
+extern cl_int cl_status;
+
+extern clsparseCreateResult createResult;
+extern clsparseStatus status;
+extern clsparseCsrMatrix Od_A, d_A, d_Q, d_Qt, d_A_ref;
+extern int clsparse_setup(const SparseMatrix h_A);
 
 /*!
   Optimizes the data structures used for CG iteration to increase the
@@ -233,6 +253,137 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   for(int i = 0; i < nrow; i++)
     A_ref.colors[i] = colors[i];
 
+  // declare and allocate qt sparse matrix to be used in CSR format
+  float * qt_matrixValues = new float[nrow];
+  local_int_t * qt_mtxIndl = new local_int_t[nrow];
+  local_int_t * qt_rowOffset = new local_int_t[nrow + 1];
+
+  // declare and allocate q sparse matrix to be used in CSR format
+  local_int_t * q_mtxIndl = new local_int_t[nrow];
+  local_int_t * q_rowOffset = new local_int_t[nrow + 1];
+
+  // Generating qt based on the reordering order
+  int indx = 0;
+  qt_rowOffset[0] = 0;
+  for(int i = 0; i < nrow; i++)
+  {
+    for(int j = 0; j < nrow; j++)
+    {
+      if(A_ref.colors[i] == j)
+      {
+        qt_matrixValues[indx] = 1;
+        qt_mtxIndl[indx++] = j;
+        qt_rowOffset[indx] = qt_rowOffset[indx - 1] + 1;
+        break;
+      }
+    }
+  }
+
+
+
+
+/*
+  
+  // take transpose for qt such that " q = transpose(qt)"
+
+  // convert A matrix to CSR format
+
+  // Perform the multiplication A_ref = qt * A * q
+
+  // convert A_ref to ELL format and save matrix values to A_ref.matrixValues 
+     and col indices to A_ref.mtxIndl
+
+*/
+
+  /* Opencl and clSPARSE setup */
+  // if (!call_count)
+  // {
+  //   clsparse_setup(A);
+  // }
+
+  if (call_count)
+  {
+    for(int i = 0; i < nrow; i++)
+      nnzInRow[i] = Count[i] = 0;
+  }
+  
+  if (!call_count)
+  {
+    clsparse_setup(A);
+    ++call_count;
+  }
+
+
+  /* Transpose */  
+ 
+  for(int i = 0; i < nrow; i++)
+    nnzInRow[qt_mtxIndl[i]] += 1;
+    
+  q_rowOffset[0] = 0;
+  for(int i = 1; i <= nrow; i++)
+     q_rowOffset[i] =  q_rowOffset[i - 1] + nnzInRow[i - 1];
+    
+  for(int i = 0; i < nrow; i++)
+  {
+    q_mtxIndl[ q_rowOffset[qt_mtxIndl[i]] + Count[qt_mtxIndl[i]]] = i;
+    Count[qt_mtxIndl[i]]++;
+  }
+  
+  
+  
+  /* CSR Matrix */  
+  /* A */  
+  k = 0;
+  frowOff[0] = 0;
+  for(int i = 1; i <= A.totalNumberOfRows; i++)
+    frowOff[i] = frowOff[i - 1] + A.nonzerosInRow[i - 1];
+    
+  for(int i = 0; i < A.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < A.nonzerosInRow[i]; j++)
+     {
+       fcol[k] = A.mtxIndL[i][j];
+       k++;
+     }
+  }       
+  
+  k = 0;
+  for(int i = 0; i < A.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < A.nonzerosInRow[i]; j++)
+     {
+       fval[k] = (float)A.matrixValues[i][j];
+       k++;
+     }
+  }
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, Od_A, fcol, frowOff);
+
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), Od_A.values, CL_TRUE, 0,
+                              Od_A.num_nonzeros * sizeof( float ), fval, 0, NULL, NULL ); 
+                              
+  /* Qt */
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, d_Qt, qt_mtxIndl, qt_rowOffset);
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Qt.values, CL_TRUE, 0,
+                              d_Qt.num_nonzeros * sizeof( float ), qt_matrixValues, 0, NULL, NULL ); 
+            
+  /* Q */
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, d_Q, q_mtxIndl, q_rowOffset);
+  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Q.values, CL_TRUE, 0,
+                              d_Q.num_nonzeros * sizeof( float ), qt_matrixValues, 0, NULL, NULL ); 
+                                
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, d_A_ref, NULL, NULL);
+  /* clSPARSE matrix-matrix multiplication */
+  clsparseScsrSpGemm(&d_Qt, &Od_A, &d_A_ref, createResult.control);
+  clsparseScsrSpGemm(&d_A_ref, &d_Q, &d_A_ref, createResult.control);
+
+  /* Copy back the result */ 
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A_ref.values, CL_TRUE, 0,
+                              d_A_ref.num_nonzeros * sizeof(float), fval, 0, NULL, NULL );
+                                                                                                                                     
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A_ref.col_indices, CL_TRUE, 0,
+                              d_A_ref.num_nonzeros * sizeof(clsparseIdx_t ), fcol, 0, NULL, NULL );    
+                                                               
+  
   // Rearranges the reference matrix according to the coloring index.
   #ifndef HPCG_NO_OPENMP
     #pragma omp parallel for
@@ -241,18 +392,18 @@ for(int i = 0; i < nrow; i++)
   {
 	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
      A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
-	   const double * const currentValues = A.matrixValues[A_ref.colors[i]];
-	   const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
+	   //const double * const currentValues = A.matrixValues[A_ref.colors[i]];
+	   //const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
 
 	   double * diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
 	   A_ref.matrixDiagonal[i] = diagonalValue;
 
 		//rearrange the elements in the row
-     int col_indx = 0;
+     /*int col_indx = 0;
      #ifndef HPCG_NO_OPENMP
       #pragma omp parallel for
-     #endif
-     for(int k = 0; k < nrow; k++)
+     #endif*/
+     /*for(int k = 0; k < nrow; k++)
      {
 	      for(int j = 0; j < currentNumberOfNonzeros; j++)
 	      {
@@ -263,9 +414,30 @@ for(int i = 0; i < nrow; i++)
 			        break;
    	       }
         }
-     }
+     }*/
   }
-
+ 
+  /* Copy back A_ref values and col indices */
+  k = 0;
+  for(int i = 0; i < A_ref.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < A_ref.nonzerosInRow[i]; j++)
+     {
+       A_ref.matrixValues[i][j] = (double)fval[k];
+       k++;
+     }
+  }  
+  
+  k = 0;
+  for(int i = 0; i < A_ref.totalNumberOfRows; i++) 
+  {
+     for(int j = 0; j < A_ref.nonzerosInRow[i]; j++)
+     {
+       A_ref.mtxIndL[i][j] = fcol[k];
+       k++;
+     }
+  }          
+  
   delete [] row_offset;
   delete [] col_index;
   delete [] random;

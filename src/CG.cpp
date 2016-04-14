@@ -57,9 +57,16 @@ cldenseVector d_p, d_Ap, d_b, d_r, d_x;
 clsparseScalar d_alpha, d_beta, d_normr, d_minus; 
   
 double *val;
-int *col, *rowoff;
+int *fcol, *frowOff;
 
 clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
+
+int call_count;
+float *fval, *qt_matrixValues;
+int *col, *rowOff, *nnzInRow, *Count;
+local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+
+clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
 
 /*!
   Routine to compute an approximate solution to Ax = b
@@ -98,15 +105,32 @@ int clsparse_setup(const SparseMatrix h_A)
   CLSPARSE_V( createResult.status, "Failed to create clsparse control" );
   
   clsparseInitCsrMatrix(&d_A);
-  
+  clsparseInitCsrMatrix(&Od_A);
+  clsparseInitCsrMatrix(&d_Q);
+  clsparseInitCsrMatrix(&d_Qt);
+  clsparseInitCsrMatrix(&d_A_ref);
+
+  fval = new float[h_A.totalNumberOfNonzeros];
+  fcol = new int[h_A.totalNumberOfNonzeros];
+  frowOff = new int[h_A.localNumberOfRows + 1];
+
   val = new double[h_A.totalNumberOfNonzeros];
   col = new int[h_A.totalNumberOfNonzeros];
-  rowoff = new int[h_A.localNumberOfRows + 1];     
-  
+  rowOff = new int[h_A.localNumberOfRows + 1];
+  ///////////////////////////////////
+  nnzInRow = new int[h_A.localNumberOfRows]();
+  Count = new int[h_A.localNumberOfRows]();
+
+  qt_matrixValues = new float[h_A.localNumberOfRows];
+  qt_mtxIndl = new local_int_t[h_A.localNumberOfRows];
+  qt_rowOffset = new local_int_t[h_A.localNumberOfRows + 1];
+  q_mtxIndl = new local_int_t[h_A.localNumberOfRows];
+  q_rowOffset = new local_int_t[h_A.localNumberOfRows + 1];
+  ///////////////////////////////////
   int k = 0;
-  rowoff[0] = 0;
+  rowOff[0] = 0;
   for(int i = 1; i <= h_A.totalNumberOfRows; i++)
-    rowoff[i] = rowoff[i - 1] + h_A.nonzerosInRow[i - 1];
+    rowOff[i] = rowOff[i - 1] + h_A.nonzerosInRow[i - 1];
     
   for(int i = 0; i < h_A.totalNumberOfRows; i++) 
   {
@@ -116,7 +140,7 @@ int clsparse_setup(const SparseMatrix h_A)
        k++;
      }
   }             
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, d_A, col, rowoff);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, d_A, col, rowOff);
                                       
   // This function allocates memory for rowBlocks structure. If not called
   // the structure will not be calculated and clSPARSE will run the vectorized
@@ -199,7 +223,7 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
 //  double t6 = 0.0;
 //#endif
   size_t globalSize = 64;
-  static int call_count;
+  // static int call_count;
   
   if (!call_count) 
   {  
@@ -274,8 +298,7 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
     TOCK(t5); // Preconditioner apply time
 
     clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_b.values, CL_TRUE, 0,
-                              d_A.num_rows * sizeof( double ), z.values, 0, NULL, NULL );     
-
+                              d_A.num_rows * sizeof( double ), z.values, 0, NULL, NULL );
     if (k == 1) {
       TICK(); ComputeWAXPBY(d_alpha, d_b, d_beta, d_b, d_p); TOCK(t2); // Copy Mr to p
       TICK(); ComputeDotProduct(d_r, d_b, d_rtz, t4); TOCK(t1); // rtz = r'*z

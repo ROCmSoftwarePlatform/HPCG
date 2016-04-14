@@ -73,15 +73,19 @@ extern cl_int cl_status;
 extern clsparseCreateResult createResult;
 extern clsparseStatus status;
 
-extern clsparseCsrMatrix d_A;
+//===extern clsparseCsrMatrix d_A;
 extern cldenseVector d_p, d_Ap, d_b, d_r, d_x;
 extern clsparseScalar d_alpha, d_beta, d_normr, d_minus;
 extern clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
 
 extern double *val;
-extern int *col, *rowoff;
+extern int *fcol, *frowOff;
 
 //extern double spmv_time;
+extern float *fval, *qt_matrixValues;
+extern int *col, *rowOff, *nnzInRow, *Count;
+extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+extern clsparseCsrMatrix Od_A, d_A, d_Q, d_Qt, d_A_ref;
 
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
@@ -459,9 +463,36 @@ int main(int argc, char * argv[]) {
   clReleaseMemObject ( d_r.values );
   clReleaseMemObject ( d_x.values );
 
-  delete [] val;
+  delete [] fval;
+  delete [] fcol;
+  delete [] frowOff;
+  
+  clReleaseMemObject ( Od_A.col_indices );
+  clReleaseMemObject ( Od_A.row_pointer );
+  clReleaseMemObject ( Od_A.values );
+  
+  clReleaseMemObject ( d_Qt.col_indices );
+  clReleaseMemObject ( d_Qt.row_pointer );
+  clReleaseMemObject ( d_Qt.values );
+  
+  clReleaseMemObject ( d_Q.col_indices );
+  clReleaseMemObject ( d_Q.row_pointer );
+  clReleaseMemObject ( d_Q.values );
+  
+  clReleaseMemObject ( d_A_ref.col_indices );
+  clReleaseMemObject ( d_A_ref.row_pointer );
+  clReleaseMemObject ( d_A_ref.values );
+  
   delete [] col;
-  delete [] rowoff;
+  delete [] val;
+  delete [] rowOff;
+  delete [] nnzInRow;
+  delete [] Count;
+  delete [] qt_matrixValues;
+  delete [] qt_mtxIndl;
+  delete [] qt_rowOffset;
+  delete [] q_mtxIndl;
+  delete [] q_rowOffset;
 
   HPCG_Finalize();
 
