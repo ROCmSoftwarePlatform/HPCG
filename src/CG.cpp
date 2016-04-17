@@ -48,7 +48,7 @@
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
 
 clsparseScalar d_Beta, d_Alpha;
-  
+
 /*!
   Routine to compute an approximate solution to Ax = b
 
@@ -70,21 +70,17 @@ clsparseScalar d_Beta, d_Alpha;
   @see CG_ref()
 */
 
-int count_cg;
-
-int clsparse_setup(SparseMatrix &h_A)
-{
+int clsparse_setup(SparseMatrix &h_A) {
   clsparseStatus status = clsparseSetup();
-  if (status != clsparseSuccess)
-  {
-      std::cout << "Problem with executing clsparseSetup()" << std::endl;
-      return -3;
+  if (status != clsparseSuccess) {
+    std::cout << "Problem with executing clsparseSetup()" << std::endl;
+    return -3;
   }
 
   // Create clsparseControl object
   h_A.createResult = clsparseCreateControl(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
-  CLSPARSE_V( h_A.createResult.status, "Failed to create clsparse control" );
-  
+  CLSPARSE_V(h_A.createResult.status, "Failed to create clsparse control");
+
   clsparseInitCsrMatrix(&h_A.d_A);
   clsparseInitCsrMatrix(&h_A.Od_A);
   clsparseInitCsrMatrix(&h_A.d_Q);
@@ -103,35 +99,34 @@ int clsparse_setup(SparseMatrix &h_A)
   ///////////////////////////////////
   int k = 0;
   rowOff[0] = 0;
-  for(int i = 1; i <= h_A.totalNumberOfRows; i++)
+  for (int i = 1; i <= h_A.totalNumberOfRows; i++) {
     rowOff[i] = rowOff[i - 1] + h_A.nonzerosInRow[i - 1];
-    
-  for(int i = 0; i < h_A.totalNumberOfRows; i++) 
-  {
-     for(int j = 0; j < h_A.nonzerosInRow[i]; j++)
-     {
-       col[k] = h_A.mtxIndL[i][j];
-       k++;
-     }
-  }             
+  }
+
+  for (int i = 0; i < h_A.totalNumberOfRows; i++) {
+    for (int j = 0; j < h_A.nonzerosInRow[i]; j++) {
+      col[k] = h_A.mtxIndL[i][j];
+      k++;
+    }
+  }
   HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, h_A.d_A, col, rowOff);
-                                      
+
   // This function allocates memory for rowBlocks structure. If not called
   // the structure will not be calculated and clSPARSE will run the vectorized
   // version of SpMV instead of adaptive;
-  clsparseCsrMetaCreate( &h_A.d_A, h_A.createResult.control );
-  
+  clsparseCsrMetaCreate(&h_A.d_A, h_A.createResult.control);
+
   clsparseInitVector(&h_A.d_p);
   clsparseInitVector(&h_A.d_Ap);
   clsparseInitVector(&h_A.d_b);
   clsparseInitVector(&h_A.d_r);
   clsparseInitVector(&h_A.d_x);
-  
+
   clsparseInitScalar(&h_A.d_alpha);
   clsparseInitScalar(&h_A.d_beta);
   clsparseInitScalar(&h_A.d_normr);
   clsparseInitScalar(&h_A.d_minus);
-  
+
   clsparseInitScalar(&h_A.d_rtz);
   clsparseInitScalar(&h_A.d_oldrtz);
   clsparseInitScalar(&h_A.d_pAp);
@@ -141,8 +136,8 @@ int clsparse_setup(SparseMatrix &h_A)
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_b,  h_A.d_A.num_rows);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_r,  h_A.d_A.num_rows);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_x,  h_A.d_A.num_rows);
-  
-  // d_x.num_values = d_A.num_rows;                
+
+  // d_x.num_values = d_A.num_rows;
   double one = 1.0;
   double zero = 0.0;
   double minus = -1.0;
@@ -150,7 +145,7 @@ int clsparse_setup(SparseMatrix &h_A)
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_alpha, one);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_beta,  zero);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_minus, minus);
-  
+
   // Create the input and output arrays in device memory for our calculation
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_normr);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_rtz);
@@ -166,18 +161,18 @@ int clsparse_setup(SparseMatrix &h_A)
 
   // Set the arguments to our compute kernel
   clSetKernelArg(kernel1, 0, sizeof(cl_mem), &h_A.d_rtz.value);
-  clSetKernelArg(kernel1, 1, sizeof(cl_mem), &h_A.d_oldrtz.value);      
-    
+  clSetKernelArg(kernel1, 1, sizeof(cl_mem), &h_A.d_oldrtz.value);
+
   // Set the arguments to our compute kernel
   clSetKernelArg(kernel2, 0, sizeof(cl_mem), &h_A.d_rtz.value);
   clSetKernelArg(kernel2, 1, sizeof(cl_mem), &h_A.d_oldrtz.value);
-  clSetKernelArg(kernel2, 2, sizeof(cl_mem), &d_Beta.value);      
+  clSetKernelArg(kernel2, 2, sizeof(cl_mem), &d_Beta.value);
 
   // Set the arguments to our compute kernel
   clSetKernelArg(kernel3, 0, sizeof(cl_mem), &h_A.d_rtz.value);
   clSetKernelArg(kernel3, 1, sizeof(cl_mem), &h_A.d_pAp.value);
   clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
-  clSetKernelArg(kernel3, 3, sizeof(cl_mem), &h_A.d_minusAlpha.value);      
+  clSetKernelArg(kernel3, 3, sizeof(cl_mem), &h_A.d_minusAlpha.value);
 
   delete[] col;
   delete[] rowOff;
@@ -194,8 +189,8 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
   double rtz = 0.0, oldrtz = 0.0, alpha = 0.0, beta = 0.0, pAp = 0.0, minusAlpha = 0.0;
   double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0, t4 = 0.0, t5 = 0.0;
   size_t globalSize = 64;
-  
- 
+
+
   local_int_t nrow = A.localNumberOfRows;
   Vector &r = data.r;  // Residual vector
   Vector &z = data.z;  // Preconditioned residual vector
@@ -279,13 +274,13 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
     } else {
       // Execute the kernel over the entire range of the data set
       clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
-                                   kernelRtz, 1, NULL, &globalSize, NULL,
-                                   0, NULL, NULL);
+                             kernelRtz, 1, NULL, &globalSize, NULL,
+                             0, NULL, NULL);
       TICK(); ComputeDotProduct(A.d_r, A.d_b, A.d_rtz, t4, A.createResult); TOCK(t1); // rtz = r'*z
       // Execute the kernel over the entire range of the data set
       clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
-                                   kernelBeta, 1, NULL, &globalSize, NULL,
-                                   0, NULL, NULL);
+                             kernelBeta, 1, NULL, &globalSize, NULL,
+                             0, NULL, NULL);
       TICK(); ComputeWAXPBY(A.d_alpha, A.d_b, d_Beta, A.d_p, A.d_p, A.createResult);  TOCK(t2); // p = beta*p + z
     }
 
@@ -295,8 +290,8 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
     //alpha = rtz/pAp;
     // Execute the kernel over the entire range of the data set
     clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
-                                 kernelAlpha, 1, NULL, &globalSize, NULL,
-                                 0, NULL, NULL);
+                           kernelAlpha, 1, NULL, &globalSize, NULL,
+                           0, NULL, NULL);
 
     TICK();
     ComputeWAXPBY(A.d_alpha, A.d_x, d_Alpha, A.d_p, A.d_x, A.createResult);// x = x + alpha*p

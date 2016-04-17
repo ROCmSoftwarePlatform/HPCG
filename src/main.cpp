@@ -73,10 +73,6 @@ using std::endl;
 
 extern clsparseScalar d_Beta, d_Alpha;
 
-//extern double spmv_time;
-extern int clsparse_setup(SparseMatrix & h_A);
-
-
 /*!
   Main driver program: Construct synthetic problem, run V&V tests, compute benchmark parameters, run benchmark, report results.
 
