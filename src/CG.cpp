@@ -49,9 +49,6 @@
 
 clsparseScalar d_Beta, d_Alpha;
   
-int *fcol, *frowOff, *nnzInRow, *Count;
-
-
 /*!
   Routine to compute an approximate solution to Ax = b
 
@@ -95,15 +92,13 @@ int clsparse_setup(SparseMatrix &h_A)
   clsparseInitCsrMatrix(&h_A.d_A_ref);
 
   h_A.fval = new float[h_A.totalNumberOfNonzeros];
-  fcol = new int[h_A.totalNumberOfNonzeros];
-  frowOff = new int[h_A.localNumberOfRows + 1];
+  h_A.fcol = new int[h_A.totalNumberOfNonzeros];
+  h_A.frowOff = new int[h_A.localNumberOfRows + 1];
 
   h_A.val = new double[h_A.totalNumberOfNonzeros];
   int *col = new int[h_A.totalNumberOfNonzeros];
   int *rowOff = new int[h_A.localNumberOfRows + 1];
   ///////////////////////////////////
-  nnzInRow = new int[h_A.localNumberOfRows]();
-  Count = new int[h_A.localNumberOfRows]();
 
   ///////////////////////////////////
   int k = 0;

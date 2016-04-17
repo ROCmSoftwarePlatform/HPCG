@@ -83,6 +83,7 @@ struct SparseMatrix_STRUCT {
   clsparseScalar d_rtz, d_oldrtz, d_minusAlpha, d_pAp;
   clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
   float *fval;
+  int *fcol, *frowOff;
 
 #ifdef __OCL__
 cl_mem  clMatrixValues;
@@ -246,6 +247,8 @@ inline void DeleteMatrix(SparseMatrix & A) {
   clsparseReleaseControl(A.createResult.control);
 
   delete [] A.fval;
+  delete [] A.fcol;
+  delete [] A.frowOff;
 
   return;
 }

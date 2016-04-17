@@ -28,9 +28,6 @@
 
 using namespace std;
 
-extern int *fcol, *frowOff;
-extern int *nnzInRow, *Count;
-
 /*!
   Optimizes the data structures used for CG iteration to increase the
   performance of the benchmark version of the preconditioned CG algorithm.
@@ -298,6 +295,8 @@ int OptimizeProblem(const SparseMatrix *A_) {
     // declare and allocate q sparse matrix to be used in CSR format
     local_int_t *q_mtxIndl = new local_int_t[nrow];
     local_int_t *q_rowOffset = new local_int_t[nrow + 1];
+    int *nnzInRow = new int[nrow]();
+    int *Count = new int[nrow]();
 
     // Generating qt based on the reordering order
     int indx = 0;
@@ -364,14 +363,14 @@ int OptimizeProblem(const SparseMatrix *A_) {
     /* CSR Matrix */
     /* A */
     k = 0;
-    frowOff[0] = 0;
+    A_->frowOff[0] = 0;
     for (int i = 1; i <= A.totalNumberOfRows; i++) {
-      frowOff[i] = frowOff[i - 1] + A.nonzerosInRow[i - 1];
+      A_->frowOff[i] = A_->frowOff[i - 1] + A.nonzerosInRow[i - 1];
     }
 
     for (int i = 0; i < A.totalNumberOfRows; i++) {
       for (int j = 0; j < A.nonzerosInRow[i]; j++) {
-        fcol[k] = A.mtxIndL[i][j];
+        A_->fcol[k] = A.mtxIndL[i][j];
         k++;
       }
     }
@@ -383,7 +382,7 @@ int OptimizeProblem(const SparseMatrix *A_) {
         k++;
       }
     }
-    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix&)A_->Od_A, fcol, frowOff);
+    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix&)A_->Od_A, A_->fcol, A_->frowOff);
 
     clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->Od_A.values, CL_TRUE, 0,
                          A_->Od_A.num_nonzeros * sizeof(float), A_->fval, 0, NULL, NULL);
@@ -408,7 +407,7 @@ int OptimizeProblem(const SparseMatrix *A_) {
                         A_->d_A_ref.num_nonzeros * sizeof(float), A_->fval, 0, NULL, NULL);
 
     clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->d_A_ref.col_indices, CL_TRUE, 0,
-                        A_->d_A_ref.num_nonzeros * sizeof(clsparseIdx_t), fcol, 0, NULL, NULL);
+                        A_->d_A_ref.num_nonzeros * sizeof(clsparseIdx_t), A_->fcol, 0, NULL, NULL);
 
 
     // Rearranges the reference matrix according to the coloring index.
@@ -455,7 +454,7 @@ int OptimizeProblem(const SparseMatrix *A_) {
     k = 0;
     for (int i = 0; i < A_ref.totalNumberOfRows; i++) {
       for (int j = 0; j < A_ref.nonzerosInRow[i]; j++) {
-        A_ref.mtxIndL[i][j] = fcol[k];
+        A_ref.mtxIndL[i][j] = A_->fcol[k];
         k++;
       }
     }
@@ -468,6 +467,8 @@ int OptimizeProblem(const SparseMatrix *A_) {
     delete [] qt_rowOffset;
     delete [] q_mtxIndl;
     delete [] q_rowOffset;
+    delete [] nnzInRow; 
+    delete [] Count;
 
     Ac = Ac->Ac;
     Ac_ref = Ac_ref->Ac;

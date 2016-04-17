@@ -73,10 +73,7 @@ using std::endl;
 
 extern clsparseScalar d_Beta, d_Alpha;
 
-extern int *fcol, *frowOff;
-
 //extern double spmv_time;
-extern int *nnzInRow, *Count;
 extern int clsparse_setup(SparseMatrix & h_A);
 
 
@@ -450,18 +447,12 @@ int main(int argc, char *argv[]) {
   clReleaseMemObject(d_Alpha.value);
   clReleaseMemObject(d_Beta.value);
 
-  delete [] fcol;
-  delete [] frowOff;
-  
   /** Close & release resources */
   clsparseStatus status = clsparseTeardown();
   if (status != clsparseSuccess) {
     std::cout << "Problem with closing clSPARSE library."
               << " Error: " << status << std::endl;
   }
-
-  delete [] nnzInRow;
-  delete [] Count;
 
   HPCG_Finalize();
 
