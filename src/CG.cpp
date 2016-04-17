@@ -48,7 +48,7 @@
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
 
 clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
-clsparseScalar d_rtz, d_oldrtz, d_Beta, d_Alpha, d_minusAlpha, d_pAp;
+clsparseScalar d_Beta, d_Alpha, d_pAp;
   
 float *fval, *qt_matrixValues;
 int *fcol, *frowOff, *col, *rowOff, *nnzInRow, *Count;
@@ -145,10 +145,10 @@ int clsparse_setup(SparseMatrix &h_A)
   clsparseInitScalar(&h_A.d_normr);
   clsparseInitScalar(&h_A.d_minus);
   
-  clsparseInitScalar(&d_rtz);
-  clsparseInitScalar(&d_oldrtz);
+  clsparseInitScalar(&h_A.d_rtz);
+  clsparseInitScalar(&h_A.d_oldrtz);
   clsparseInitScalar(&d_pAp);
-  clsparseInitScalar(&d_minusAlpha);
+  clsparseInitScalar(&h_A.d_minusAlpha);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_p,  h_A.d_A.num_rows);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_Ap, h_A.d_A.num_rows);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_b,  h_A.d_A.num_rows);
@@ -166,31 +166,31 @@ int clsparse_setup(SparseMatrix &h_A)
   
   // Create the input and output arrays in device memory for our calculation
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_normr);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_rtz);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_oldrtz);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_rtz);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_oldrtz);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_pAp);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Beta);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Alpha);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_minusAlpha);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_minusAlpha);
 
   cl_kernel kernel1 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("rtzCopy"));
   cl_kernel kernel2 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
   cl_kernel kernel3 = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
 
   // Set the arguments to our compute kernel
-  clSetKernelArg(kernel1, 0, sizeof(cl_mem), &d_rtz.value);
-  clSetKernelArg(kernel1, 1, sizeof(cl_mem), &d_oldrtz.value);      
+  clSetKernelArg(kernel1, 0, sizeof(cl_mem), &h_A.d_rtz.value);
+  clSetKernelArg(kernel1, 1, sizeof(cl_mem), &h_A.d_oldrtz.value);      
     
   // Set the arguments to our compute kernel
-  clSetKernelArg(kernel2, 0, sizeof(cl_mem), &d_rtz.value);
-  clSetKernelArg(kernel2, 1, sizeof(cl_mem), &d_oldrtz.value);
+  clSetKernelArg(kernel2, 0, sizeof(cl_mem), &h_A.d_rtz.value);
+  clSetKernelArg(kernel2, 1, sizeof(cl_mem), &h_A.d_oldrtz.value);
   clSetKernelArg(kernel2, 2, sizeof(cl_mem), &d_Beta.value);      
 
   // Set the arguments to our compute kernel
-  clSetKernelArg(kernel3, 0, sizeof(cl_mem), &d_rtz.value);
+  clSetKernelArg(kernel3, 0, sizeof(cl_mem), &h_A.d_rtz.value);
   clSetKernelArg(kernel3, 1, sizeof(cl_mem), &d_pAp.value);
   clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
-  clSetKernelArg(kernel3, 3, sizeof(cl_mem), &d_minusAlpha.value);      
+  clSetKernelArg(kernel3, 3, sizeof(cl_mem), &h_A.d_minusAlpha.value);      
 
   return 0;
 }
@@ -285,14 +285,14 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
 
     if (k == 1) {
       TICK(); ComputeWAXPBY(A.d_alpha, A.d_b, A.d_beta, A.d_b, A.d_p, A.createResult); TOCK(t2); // Copy Mr to p
-      TICK(); ComputeDotProduct(A.d_r, A.d_b, d_rtz, t4, A.createResult); TOCK(t1); // rtz = r'*z
+      TICK(); ComputeDotProduct(A.d_r, A.d_b, A.d_rtz, t4, A.createResult); TOCK(t1); // rtz = r'*z
 
     } else {
       // Execute the kernel over the entire range of the data set
       clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
                                    kernelRtz, 1, NULL, &globalSize, NULL,
                                    0, NULL, NULL);
-      TICK(); ComputeDotProduct(A.d_r, A.d_b, d_rtz, t4, A.createResult); TOCK(t1); // rtz = r'*z
+      TICK(); ComputeDotProduct(A.d_r, A.d_b, A.d_rtz, t4, A.createResult); TOCK(t1); // rtz = r'*z
       // Execute the kernel over the entire range of the data set
       clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
                                    kernelBeta, 1, NULL, &globalSize, NULL,
@@ -311,7 +311,7 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
 
     TICK();
     ComputeWAXPBY(A.d_alpha, A.d_x, d_Alpha, A.d_p, A.d_x, A.createResult);// x = x + alpha*p
-    ComputeWAXPBY(A.d_alpha, A.d_r, d_minusAlpha, A.d_Ap, A.d_r, A.createResult);
+    ComputeWAXPBY(A.d_alpha, A.d_r, A.d_minusAlpha, A.d_Ap, A.d_r, A.createResult);
     TOCK(t2);// r = r - alpha*Ap
 
     TICK(); ComputeDotProduct(A.d_r, A.d_r, A.d_normr, t4, A.createResult); TOCK(t1);
