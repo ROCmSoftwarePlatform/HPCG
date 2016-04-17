@@ -33,8 +33,6 @@ extern float *fval, *qt_matrixValues;
 extern int *col, *rowOff, *nnzInRow, *Count;
 extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
 
-extern clsparseCsrMatrix d_Qt, d_A_ref;
-
 /*!
   Optimizes the data structures used for CG iteration to increase the
   performance of the benchmark version of the preconditioned CG algorithm.
@@ -393,26 +391,26 @@ int OptimizeProblem(const SparseMatrix *A_) {
                          A_->Od_A.num_nonzeros * sizeof(float), fval, 0, NULL, NULL);
 
     /* Qt */
-    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, d_Qt, qt_mtxIndl, qt_rowOffset);
-    clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Qt.values, CL_TRUE, 0,
-                         d_Qt.num_nonzeros * sizeof(float), qt_matrixValues, 0, NULL, NULL);
+    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix &)A_->d_Qt, qt_mtxIndl, qt_rowOffset);
+    clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->d_Qt.values, CL_TRUE, 0,
+                         A_->d_Qt.num_nonzeros * sizeof(float), qt_matrixValues, 0, NULL, NULL);
 
     /* Q */
     HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix &)A_->d_Q, q_mtxIndl, q_rowOffset);
     clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->d_Q.values, CL_TRUE, 0,
                          A_->d_Q.num_nonzeros * sizeof(float), qt_matrixValues, 0, NULL, NULL);
 
-    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, d_A_ref, NULL, NULL);
+    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix&)A_->d_A_ref, NULL, NULL);
     /* clSPARSE matrix-matrix multiplication */
-    clsparseScsrSpGemm(&d_Qt, &A_->Od_A, &d_A_ref, A_->createResult.control);
-    clsparseScsrSpGemm(&d_A_ref, &A_->d_Q, &d_A_ref, A_->createResult.control);
+    clsparseScsrSpGemm(&A_->d_Qt, &A_->Od_A, (clsparseCsrMatrix*)&A_->d_A_ref, A_->createResult.control);
+    clsparseScsrSpGemm(&A_->d_A_ref, &A_->d_Q, (clsparseCsrMatrix*)&A_->d_A_ref, A_->createResult.control);
 
     /* Copy back the result */
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A_ref.values, CL_TRUE, 0,
-                        d_A_ref.num_nonzeros * sizeof(float), fval, 0, NULL, NULL);
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->d_A_ref.values, CL_TRUE, 0,
+                        A_->d_A_ref.num_nonzeros * sizeof(float), fval, 0, NULL, NULL);
 
-    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A_ref.col_indices, CL_TRUE, 0,
-                        d_A_ref.num_nonzeros * sizeof(clsparseIdx_t), fcol, 0, NULL, NULL);
+    clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->d_A_ref.col_indices, CL_TRUE, 0,
+                        A_->d_A_ref.num_nonzeros * sizeof(clsparseIdx_t), fcol, 0, NULL, NULL);
 
 
     // Rearranges the reference matrix according to the coloring index.
