@@ -29,8 +29,7 @@
 using namespace std;
 
 extern int *fcol, *frowOff;
-extern int *col, *rowOff, *nnzInRow, *Count;
-extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+extern int *nnzInRow, *Count;
 
 /*!
   Optimizes the data structures used for CG iteration to increase the
@@ -465,6 +464,10 @@ int OptimizeProblem(const SparseMatrix *A_) {
     delete [] col_index;
     delete [] random;
     delete [] qt_matrixValues;
+    delete [] qt_mtxIndl;
+    delete [] qt_rowOffset;
+    delete [] q_mtxIndl;
+    delete [] q_rowOffset;
 
     Ac = Ac->Ac;
     Ac_ref = Ac_ref->Ac;

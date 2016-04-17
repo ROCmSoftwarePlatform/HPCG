@@ -76,8 +76,7 @@ extern clsparseScalar d_Beta, d_Alpha;
 extern int *fcol, *frowOff;
 
 //extern double spmv_time;
-extern int *col, *rowOff, *nnzInRow, *Count;
-extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+extern int *nnzInRow, *Count;
 extern int clsparse_setup(SparseMatrix & h_A);
 
 
@@ -461,14 +460,8 @@ int main(int argc, char *argv[]) {
               << " Error: " << status << std::endl;
   }
 
-  delete [] col;
-  delete [] rowOff;
   delete [] nnzInRow;
   delete [] Count;
-  delete [] qt_mtxIndl;
-  delete [] qt_rowOffset;
-  delete [] q_mtxIndl;
-  delete [] q_rowOffset;
 
   HPCG_Finalize();
 

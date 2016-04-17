@@ -49,8 +49,7 @@
 
 clsparseScalar d_Beta, d_Alpha;
   
-int *fcol, *frowOff, *col, *rowOff, *nnzInRow, *Count;
-local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
+int *fcol, *frowOff, *nnzInRow, *Count;
 
 
 /*!
@@ -100,16 +99,12 @@ int clsparse_setup(SparseMatrix &h_A)
   frowOff = new int[h_A.localNumberOfRows + 1];
 
   h_A.val = new double[h_A.totalNumberOfNonzeros];
-  col = new int[h_A.totalNumberOfNonzeros];
-  rowOff = new int[h_A.localNumberOfRows + 1];
+  int *col = new int[h_A.totalNumberOfNonzeros];
+  int *rowOff = new int[h_A.localNumberOfRows + 1];
   ///////////////////////////////////
   nnzInRow = new int[h_A.localNumberOfRows]();
   Count = new int[h_A.localNumberOfRows]();
 
-  qt_mtxIndl = new local_int_t[h_A.localNumberOfRows];
-  qt_rowOffset = new local_int_t[h_A.localNumberOfRows + 1];
-  q_mtxIndl = new local_int_t[h_A.localNumberOfRows];
-  q_rowOffset = new local_int_t[h_A.localNumberOfRows + 1];
   ///////////////////////////////////
   int k = 0;
   rowOff[0] = 0;
@@ -189,6 +184,8 @@ int clsparse_setup(SparseMatrix &h_A)
   clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
   clSetKernelArg(kernel3, 3, sizeof(cl_mem), &h_A.d_minusAlpha.value);      
 
+  delete[] col;
+  delete[] rowOff;
   return 0;
 }
 

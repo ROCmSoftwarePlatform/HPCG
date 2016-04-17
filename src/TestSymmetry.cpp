@@ -46,7 +46,6 @@ using std::endl;
 #include "clSPARSE.h"
 #include "OCL.hpp"
 
-extern int *col, *rowoff;
 extern clsparseScalar d_Beta, d_Alpha;
 
 /*!
