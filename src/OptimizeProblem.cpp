@@ -247,9 +247,6 @@ int OptimizeProblem(const SparseMatrix *A_) {
     LubysGraphKernel::ReleaseCpuMem();
 #endif
 
-    /*std::cout << "total " << nrow
-              << " cycle " << c << std::endl;*/
-
     // Calculate number of rows with the same color and save it in counter vector.
     std::vector<local_int_t> counters(c + 2);
     A_ref.counters.resize(c + 2);
@@ -312,27 +309,11 @@ int OptimizeProblem(const SparseMatrix *A_) {
       }
     }
 
-
-
-
-    /*
-
-      // take transpose for qt such that " q = transpose(qt)"
-
-      // convert A matrix to CSR format
-
-      // Perform the multiplication A_ref = qt * A * q
-
-      // convert A_ref to ELL format and save matrix values to A_ref.matrixValues
-         and col indices to A_ref.mtxIndl
-
-    */
-
-    /* Opencl and clSPARSE setup */
-    // if (!call_count)
-    // {
-    //   clsparse_setup(A);
-    // }
+    // take transpose for qt such that " q = transpose(qt)"
+    // convert A matrix to CSR format
+    // Perform the multiplication A_ref = qt * A * q
+    // convert A_ref to ELL format and save matrix values to A_ref.matrixValues
+    // and col indices to A_ref.mtxIndl
 
     static bool isCalled = false;
     if (isCalled) {
@@ -357,8 +338,6 @@ int OptimizeProblem(const SparseMatrix *A_) {
       q_mtxIndl[ q_rowOffset[qt_mtxIndl[i]] + Count[qt_mtxIndl[i]]] = i;
       Count[qt_mtxIndl[i]]++;
     }
-
-
 
     /* CSR Matrix */
     /* A */
@@ -422,24 +401,6 @@ int OptimizeProblem(const SparseMatrix *A_) {
 
       double *diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
       A_ref.matrixDiagonal[i] = diagonalValue;
-
-      //rearrange the elements in the row
-      /*int col_indx = 0;
-      #ifndef HPCG_NO_OPENMP
-       #pragma omp parallel for
-      #endif*/
-      /*for(int k = 0; k < nrow; k++)
-      {
-         for(int j = 0; j < currentNumberOfNonzeros; j++)
-         {
-            if(A_ref.colors[k] == currentColIndices[j])
-            {
-              A_ref.matrixValues[i][col_indx] = currentValues[j];
-              A_ref.mtxIndL[i][col_indx++] = k;
-              break;
-            }
-         }
-      }*/
     }
 
     /* Copy back A_ref values and col indices */

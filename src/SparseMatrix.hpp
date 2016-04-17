@@ -90,6 +90,9 @@ cl_mem  clMatrixValues;
 cl_mem  clMtxIndL;
 cl_mem  clNonzerosInRow;
 cl_mem  clMatrixDiagonal;
+cl_mem  clRv;
+cl_mem  clXv;
+
 double* mtxDiagonal;
 double* mtxValue;
 local_int_t* matrixIndL;
@@ -143,6 +146,8 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.mtxDiagonal = NULL;
   A.mtxValue = NULL;
   A.matrixIndL = NULL;
+  A.clRv = NULL;
+  A.clXv = NULL;
 #endif
   A.mgData = 0; // Fine-to-coarse grid transfer initially not defined.
   A.Ac =0;
@@ -243,7 +248,9 @@ inline void DeleteMatrix(SparseMatrix & A) {
   clReleaseMemObject(A.d_A_ref.row_pointer);
   clReleaseMemObject(A.d_A_ref.values);
 
-  
+  clReleaseMemObject(A.clXv);
+  clReleaseMemObject(A.clRv);
+
   clsparseReleaseControl(A.createResult.control);
 
   delete [] A.fval;
