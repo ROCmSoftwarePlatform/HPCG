@@ -47,7 +47,7 @@
 #define TICK()  t0 = mytimer() //!< record current time in 't0'
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
 
-clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
+clsparseCsrMatrix d_Qt, d_A_ref;
 clsparseScalar d_Beta, d_Alpha;
   
 float *fval, *qt_matrixValues;
@@ -92,8 +92,8 @@ int clsparse_setup(SparseMatrix &h_A)
   CLSPARSE_V( h_A.createResult.status, "Failed to create clsparse control" );
   
   clsparseInitCsrMatrix(&h_A.d_A);
-  clsparseInitCsrMatrix(&Od_A);
-  clsparseInitCsrMatrix(&d_Q);
+  clsparseInitCsrMatrix(&h_A.Od_A);
+  clsparseInitCsrMatrix(&h_A.d_Q);
   clsparseInitCsrMatrix(&d_Qt);
   clsparseInitCsrMatrix(&d_A_ref);
 

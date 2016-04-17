@@ -33,7 +33,7 @@ extern float *fval, *qt_matrixValues;
 extern int *col, *rowOff, *nnzInRow, *Count;
 extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
 
-extern clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
+extern clsparseCsrMatrix d_Qt, d_A_ref;
 
 /*!
   Optimizes the data structures used for CG iteration to increase the
@@ -387,10 +387,10 @@ int OptimizeProblem(const SparseMatrix *A_) {
         k++;
       }
     }
-    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, Od_A, fcol, frowOff);
+    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix&)A_->Od_A, fcol, frowOff);
 
-    clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), Od_A.values, CL_TRUE, 0,
-                         Od_A.num_nonzeros * sizeof(float), fval, 0, NULL, NULL);
+    clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->Od_A.values, CL_TRUE, 0,
+                         A_->Od_A.num_nonzeros * sizeof(float), fval, 0, NULL, NULL);
 
     /* Qt */
     HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, d_Qt, qt_mtxIndl, qt_rowOffset);
@@ -398,14 +398,14 @@ int OptimizeProblem(const SparseMatrix *A_) {
                          d_Qt.num_nonzeros * sizeof(float), qt_matrixValues, 0, NULL, NULL);
 
     /* Q */
-    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, d_Q, q_mtxIndl, q_rowOffset);
-    clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_Q.values, CL_TRUE, 0,
-                         d_Q.num_nonzeros * sizeof(float), qt_matrixValues, 0, NULL, NULL);
+    HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix &)A_->d_Q, q_mtxIndl, q_rowOffset);
+    clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->d_Q.values, CL_TRUE, 0,
+                         A_->d_Q.num_nonzeros * sizeof(float), qt_matrixValues, 0, NULL, NULL);
 
     HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, d_A_ref, NULL, NULL);
     /* clSPARSE matrix-matrix multiplication */
-    clsparseScsrSpGemm(&d_Qt, &Od_A, &d_A_ref, A_->createResult.control);
-    clsparseScsrSpGemm(&d_A_ref, &d_Q, &d_A_ref, A_->createResult.control);
+    clsparseScsrSpGemm(&d_Qt, &A_->Od_A, &d_A_ref, A_->createResult.control);
+    clsparseScsrSpGemm(&d_A_ref, &A_->d_Q, &d_A_ref, A_->createResult.control);
 
     /* Copy back the result */
     clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_A_ref.values, CL_TRUE, 0,

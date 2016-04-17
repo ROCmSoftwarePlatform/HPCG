@@ -79,7 +79,7 @@ extern int *fcol, *frowOff;
 extern float *fval, *qt_matrixValues;
 extern int *col, *rowOff, *nnzInRow, *Count;
 extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
-extern clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
+extern clsparseCsrMatrix d_Qt, d_A_ref;
 extern int clsparse_setup(SparseMatrix & h_A);
 
 
@@ -457,17 +457,9 @@ int main(int argc, char *argv[]) {
   delete [] fcol;
   delete [] frowOff;
   
-  clReleaseMemObject ( Od_A.col_indices );
-  clReleaseMemObject ( Od_A.row_pointer );
-  clReleaseMemObject ( Od_A.values );
-  
   clReleaseMemObject ( d_Qt.col_indices );
   clReleaseMemObject ( d_Qt.row_pointer );
   clReleaseMemObject ( d_Qt.values );
-  
-  clReleaseMemObject ( d_Q.col_indices );
-  clReleaseMemObject ( d_Q.row_pointer );
-  clReleaseMemObject ( d_Q.values );
   
   clReleaseMemObject ( d_A_ref.col_indices );
   clReleaseMemObject ( d_A_ref.row_pointer );
