@@ -47,7 +47,7 @@ using std::endl;
 #include "OCL.hpp"
 
 extern int *col, *rowoff;
-extern clsparseScalar d_Beta, d_Alpha, d_pAp;
+extern clsparseScalar d_Beta, d_Alpha;
 
 /*!
   Tests symmetry-preserving properties of the sparse matrix vector multiply and
@@ -179,14 +179,14 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_Ap.values, CL_TRUE, 0,
                        A.d_Ap.num_values * sizeof(double), z_ncol.values, 0, NULL, NULL);
 
-  ierr = ComputeDotProduct(A.d_p, A.d_Ap, d_pAp, t4, A.createResult); // y'*Minv*x
+  ierr = ComputeDotProduct(A.d_p, A.d_Ap, A.d_pAp, t4, A.createResult); // y'*Minv*x
   if (ierr) {
     HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
   }
 
   clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_minusAlpha.value, CL_TRUE, 0,
                       sizeof(double), &xtMinvy, 0, NULL, NULL);
-  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), d_pAp.value, CL_TRUE, 0,
+  clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_pAp.value, CL_TRUE, 0,
                       sizeof(double), &ytMinvx, 0, NULL, NULL);
 
 

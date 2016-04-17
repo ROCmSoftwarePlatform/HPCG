@@ -48,7 +48,7 @@
 #define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
 
 clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
-clsparseScalar d_Beta, d_Alpha, d_pAp;
+clsparseScalar d_Beta, d_Alpha;
   
 float *fval, *qt_matrixValues;
 int *fcol, *frowOff, *col, *rowOff, *nnzInRow, *Count;
@@ -147,7 +147,7 @@ int clsparse_setup(SparseMatrix &h_A)
   
   clsparseInitScalar(&h_A.d_rtz);
   clsparseInitScalar(&h_A.d_oldrtz);
-  clsparseInitScalar(&d_pAp);
+  clsparseInitScalar(&h_A.d_pAp);
   clsparseInitScalar(&h_A.d_minusAlpha);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_p,  h_A.d_A.num_rows);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_Ap, h_A.d_A.num_rows);
@@ -168,7 +168,7 @@ int clsparse_setup(SparseMatrix &h_A)
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_normr);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_rtz);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_oldrtz);
-  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_pAp);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_pAp);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Beta);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(d_Alpha);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initScalar(h_A.d_minusAlpha);
@@ -188,7 +188,7 @@ int clsparse_setup(SparseMatrix &h_A)
 
   // Set the arguments to our compute kernel
   clSetKernelArg(kernel3, 0, sizeof(cl_mem), &h_A.d_rtz.value);
-  clSetKernelArg(kernel3, 1, sizeof(cl_mem), &d_pAp.value);
+  clSetKernelArg(kernel3, 1, sizeof(cl_mem), &h_A.d_pAp.value);
   clSetKernelArg(kernel3, 2, sizeof(cl_mem), &d_Alpha.value);
   clSetKernelArg(kernel3, 3, sizeof(cl_mem), &h_A.d_minusAlpha.value);      
 
@@ -301,7 +301,7 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
     }
 
     TICK(); ComputeSPMV(A.d_A, A.d_p, A.d_Ap, A.d_alpha, A.d_beta, A.createResult); TOCK(t3); // Ap = A*p
-    TICK(); ComputeDotProduct(A.d_p, A.d_Ap, d_pAp, t4, A.createResult); TOCK(t1); // alpha = p'*Ap
+    TICK(); ComputeDotProduct(A.d_p, A.d_Ap, A.d_pAp, t4, A.createResult); TOCK(t1); // alpha = p'*Ap
 
     //alpha = rtz/pAp;
     // Execute the kernel over the entire range of the data set
