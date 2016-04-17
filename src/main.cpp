@@ -76,7 +76,6 @@ extern clsparseScalar d_Beta, d_Alpha;
 extern int *fcol, *frowOff;
 
 //extern double spmv_time;
-extern float *fval, *qt_matrixValues;
 extern int *col, *rowOff, *nnzInRow, *Count;
 extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
 extern int clsparse_setup(SparseMatrix & h_A);
@@ -452,7 +451,6 @@ int main(int argc, char *argv[]) {
   clReleaseMemObject(d_Alpha.value);
   clReleaseMemObject(d_Beta.value);
 
-  delete [] fval;
   delete [] fcol;
   delete [] frowOff;
   
@@ -467,7 +465,6 @@ int main(int argc, char *argv[]) {
   delete [] rowOff;
   delete [] nnzInRow;
   delete [] Count;
-  delete [] qt_matrixValues;
   delete [] qt_mtxIndl;
   delete [] qt_rowOffset;
   delete [] q_mtxIndl;

@@ -29,7 +29,6 @@
 using namespace std;
 
 extern int *fcol, *frowOff;
-extern float *fval, *qt_matrixValues;
 extern int *col, *rowOff, *nnzInRow, *Count;
 extern local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
 
@@ -381,14 +380,14 @@ int OptimizeProblem(const SparseMatrix *A_) {
     k = 0;
     for (int i = 0; i < A.totalNumberOfRows; i++) {
       for (int j = 0; j < A.nonzerosInRow[i]; j++) {
-        fval[k] = (float)A.matrixValues[i][j];
+        A_->fval[k] = (float)A.matrixValues[i][j];
         k++;
       }
     }
     HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix&)A_->Od_A, fcol, frowOff);
 
     clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->Od_A.values, CL_TRUE, 0,
-                         A_->Od_A.num_nonzeros * sizeof(float), fval, 0, NULL, NULL);
+                         A_->Od_A.num_nonzeros * sizeof(float), A_->fval, 0, NULL, NULL);
 
     /* Qt */
     HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix &)A_->d_Qt, qt_mtxIndl, qt_rowOffset);
@@ -407,7 +406,7 @@ int OptimizeProblem(const SparseMatrix *A_) {
 
     /* Copy back the result */
     clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->d_A_ref.values, CL_TRUE, 0,
-                        A_->d_A_ref.num_nonzeros * sizeof(float), fval, 0, NULL, NULL);
+                        A_->d_A_ref.num_nonzeros * sizeof(float), A_->fval, 0, NULL, NULL);
 
     clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->d_A_ref.col_indices, CL_TRUE, 0,
                         A_->d_A_ref.num_nonzeros * sizeof(clsparseIdx_t), fcol, 0, NULL, NULL);
@@ -449,7 +448,7 @@ int OptimizeProblem(const SparseMatrix *A_) {
     k = 0;
     for (int i = 0; i < A_ref.totalNumberOfRows; i++) {
       for (int j = 0; j < A_ref.nonzerosInRow[i]; j++) {
-        A_ref.matrixValues[i][j] = (double)fval[k];
+        A_ref.matrixValues[i][j] = (double)A_->fval[k];
         k++;
       }
     }
@@ -465,6 +464,7 @@ int OptimizeProblem(const SparseMatrix *A_) {
     delete [] row_offset;
     delete [] col_index;
     delete [] random;
+    delete [] qt_matrixValues;
 
     Ac = Ac->Ac;
     Ac_ref = Ac_ref->Ac;

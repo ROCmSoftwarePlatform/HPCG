@@ -49,7 +49,6 @@
 
 clsparseScalar d_Beta, d_Alpha;
   
-float *fval, *qt_matrixValues;
 int *fcol, *frowOff, *col, *rowOff, *nnzInRow, *Count;
 local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
 
@@ -96,7 +95,7 @@ int clsparse_setup(SparseMatrix &h_A)
   clsparseInitCsrMatrix(&h_A.d_Qt);
   clsparseInitCsrMatrix(&h_A.d_A_ref);
 
-  fval = new float[h_A.totalNumberOfNonzeros];
+  h_A.fval = new float[h_A.totalNumberOfNonzeros];
   fcol = new int[h_A.totalNumberOfNonzeros];
   frowOff = new int[h_A.localNumberOfRows + 1];
 
@@ -107,7 +106,6 @@ int clsparse_setup(SparseMatrix &h_A)
   nnzInRow = new int[h_A.localNumberOfRows]();
   Count = new int[h_A.localNumberOfRows]();
 
-  qt_matrixValues = new float[h_A.localNumberOfRows];
   qt_mtxIndl = new local_int_t[h_A.localNumberOfRows];
   qt_rowOffset = new local_int_t[h_A.localNumberOfRows + 1];
   q_mtxIndl = new local_int_t[h_A.localNumberOfRows];
