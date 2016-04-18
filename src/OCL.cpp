@@ -5,7 +5,7 @@
 
 namespace HPCG_OCL {
 
-std::string kernelNames[] = {"lubys_graph", "SYMGS", "rtzCopy", "computeBeta", "computeAlpha"};
+  std::string kernelNames[] = {"lubys_graph", "SYMGS", "rtzCopy", "computeBeta", "computeAlpha", "dot_product", "dot_add"};
 OCL *OCL::self = NULL;
 
 OCL *OCL::getOpenCL(void) {
