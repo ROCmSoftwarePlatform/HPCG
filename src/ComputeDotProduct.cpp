@@ -74,7 +74,7 @@ int ComputeDotProduct_OCL(cldenseVector &x, cldenseVector &y,
   clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&x.values);
   clSetKernelArg(kernel, 1, sizeof(cl_mem), (void *)&y.values);
   clSetKernelArg(kernel, 2, sizeof(cl_mem), &DotKernel::output_buffer);
-  clSetKernelArg(kernel, 3, max_local_size * 4 * sizeof(float), NULL);
+  clSetKernelArg(kernel, 3, max_local_size * 4 * sizeof(double), NULL);
 
   global_size = x.num_values / 4;
 
@@ -89,21 +89,32 @@ int ComputeDotProduct_OCL(cldenseVector &x, cldenseVector &y,
   if(cl_status < 0) {
     std::cout << "Couldn't enqueue the dot product kernel. status: " << cl_status << std::endl;
     return 0;
-   }
-
-  /* Read output buffer */
-  cl_status = clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
-                                  DotKernel::output_buffer, CL_TRUE, 0,
-                                  num_groups * sizeof(double), output_vec, 0, NULL, NULL);
-  if(cl_status < 0) {
-    std::cout << "Couldn't read the buffer. status: " << cl_status << std::endl;
-    return 0;
   }
-  double t_value = 0.0f;
-  for(int i = 0; i < num_groups; i++)
-    t_value += output_vec[i];
-  clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), r.value, CL_TRUE, 0,
-                       sizeof(double), &t_value, 0, NULL, NULL);
+  cl_kernel kernel_add = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("dot_add"));
+
+  clSetKernelArg(kernel_add, 0, sizeof(cl_mem), &DotKernel::output_buffer);
+  clSetKernelArg(kernel_add, 1, sizeof(cl_mem), &r.value);
+  for(size_t t = num_groups; t > 1  ; t /= max_local_size) {
+    size_t local_size_;
+    if(t < max_local_size) {
+      local_size_ = t;
+    } else {
+      local_size_ = max_local_size;
+    }
+    clSetKernelArg(kernel_add, 2, local_size_ * 4 * sizeof(double), NULL);
+    global_size = t;
+    cl_status = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
+                                       kernel_add,
+                                       1,
+                                       NULL,
+                                       &global_size,
+                                       &local_size_,
+                                       0, NULL, NULL);
+    if(cl_status < 0) {
+      std::cout << "Couldn't enqueue the dot add kernel. status: " << cl_status << std::endl;
+      return 0;
+    }
+  }
   free(output_vec);
   return 0;
 }
