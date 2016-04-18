@@ -94,15 +94,10 @@ int ComputeDotProduct_OCL(cldenseVector &x, cldenseVector &y,
 
   clSetKernelArg(kernel_add, 0, sizeof(cl_mem), &DotKernel::output_buffer);
   clSetKernelArg(kernel_add, 1, sizeof(cl_mem), &r.value);
-  for(size_t t = num_groups; t > 1  ; t /= max_local_size) {
-    size_t local_size_;
-    if(t < max_local_size) {
-      local_size_ = t;
-    } else {
-      local_size_ = max_local_size;
-    }
-    clSetKernelArg(kernel_add, 2, local_size_ * 4 * sizeof(double), NULL);
-    global_size = t;
+  {
+    size_t local_size_ = num_groups < max_local_size ? num_groups : max_local_size;
+    clSetKernelArg(kernel_add, 2, local_size_ * sizeof(double), NULL);
+    global_size = num_groups;
     cl_status = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
                                        kernel_add,
                                        1,
