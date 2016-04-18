@@ -147,9 +147,9 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   }
 
   // Test symmetry of symmetric Gauss-Seidel
-
+  double t = 0.0;
   // Compute x'*Minv*y
-  ierr = ComputeMG(A, A_ref, y_ncol, z_ncol); // z_ncol = Minv*y_ncol
+  ierr = ComputeMG(A, A_ref, y_ncol, z_ncol, &t); // z_ncol = Minv*y_ncol
 
   if (ierr) {
     HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
@@ -168,7 +168,7 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
                       A.d_b.num_values * sizeof(double), x_ncol.values, 0, NULL, NULL);
 
   // Next, compute z'*Minv*x
-  ierr = ComputeMG(A, A_ref, x_ncol, z_ncol); // z_ncol = Minv*x_ncol
+  ierr = ComputeMG(A, A_ref, x_ncol, z_ncol, &t); // z_ncol = Minv*x_ncol
 
   if (ierr) {
     HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;

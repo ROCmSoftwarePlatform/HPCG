@@ -75,7 +75,7 @@ void rearrange_vector(const Vector &x, Vector &x_copy, std::vector<local_int_t> 
    x_copy.localLength = x.localLength;
 }
 
-int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, Vector & x) {
+int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, Vector & x, double *dur) {
 
   assert(x.localLength==A.localNumberOfColumns); 
 
@@ -102,7 +102,7 @@ int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, V
       
       /* call symgs by with reordered reference sparse matrix , rhs vector
       and x vector */
-      ierr += ComputeSYMGS(A_ref, r_copy, x_copy);
+      ierr += ComputeSYMGS(A_ref, r_copy, x_copy, dur);
 
       /* copy back the x vector back to the original index*/
       copy_back_vectors(x, x_copy, A_ref.colors, A.localNumberOfRows);
@@ -113,7 +113,7 @@ int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, V
     ierr = ComputeSPMV_ref(A, x, *A.mgData->Axf); if (ierr!=0) return ierr;
     // Perform restriction operation using simple injection
     ierr = ComputeRestriction_ref(A, r);  if (ierr!=0) return ierr;
-    ierr = ComputeMG(*A.Ac, *A_ref.Ac, *A.mgData->rc, *A.mgData->xc);  if (ierr!=0) return ierr;
+    ierr = ComputeMG(*A.Ac, *A_ref.Ac, *A.mgData->rc, *A.mgData->xc, dur);  if (ierr!=0) return ierr;
     ierr = ComputeProlongation_ref(A, x);  if (ierr!=0) return ierr;
     int numberOfPostsmootherSteps = A.mgData->numberOfPostsmootherSteps;
     for (int i=0; i< numberOfPostsmootherSteps; ++i) 
@@ -131,7 +131,7 @@ int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, V
       
       /* call symgs by with reordered reference sparse matrix , rhs vector
       and x vector */
-      ierr += ComputeSYMGS(A_ref, r_copy, x_copy);
+      ierr += ComputeSYMGS(A_ref, r_copy, x_copy, dur);
       
       /* copy back the x vector back to the original index*/
       copy_back_vectors(x, x_copy, A_ref.colors, A.localNumberOfRows);
@@ -154,7 +154,7 @@ int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, V
       
       /* call symgs by with reordered reference sparse matrix , rhs vector
       and x vector */
-      ierr += ComputeSYMGS(A_ref, r_copy, x_copy);
+      ierr += ComputeSYMGS(A_ref, r_copy, x_copy, dur);
       
       /* copy back the x vector back to the original index*/
       copy_back_vectors(x, x_copy, A_ref.colors, A.localNumberOfRows);

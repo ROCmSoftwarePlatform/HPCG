@@ -24,8 +24,14 @@
 #include "OptimizeProblem.hpp"
 #include "ComputeSYMGS_ref.hpp"
 #include "OCL.hpp"
+#include "mytimer.hpp"
 #include <vector>
 using namespace std;
+
+// Use TICK and TOCK to time a code section in MATLAB-like fashion
+#define TICK()  t0 = mytimer() //!< record current time in 't0'
+#define TOCK(t) t += mytimer() - t0 //!< store time difference in 't' using time in 't0'
+
 
 /*!
   Routine to one step of symmetrix Gauss-Seidel:
@@ -54,7 +60,7 @@ using namespace std;
   @see ComputeSYMGS_ref
 */
 
-static void ComputeSYMGS_OCL(SparseMatrix &A, const Vector &r, Vector &x) {
+static void ComputeSYMGS_OCL(SparseMatrix &A, const Vector &r, Vector &x, double * dur) {
   const local_int_t nrow = A.localNumberOfRows;
   local_int_t i = 0;
   int k;
@@ -101,6 +107,9 @@ static void ComputeSYMGS_OCL(SparseMatrix &A, const Vector &r, Vector &x) {
   clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&A.clRv);
   clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&A.clXv);
 
+  double t = 0.0;
+  double t0 = 0.0;
+    TICK();
   // forward sweep to be carried out in parallel.
   for (k = 1; k < (int)(A.counters.size()); k++) {
     if (!(i < nrow && i < A.counters[k])) {
@@ -147,6 +156,8 @@ static void ComputeSYMGS_OCL(SparseMatrix &A, const Vector &r, Vector &x) {
     i -= (threadNum);
   }
 
+  clFinish(HPCG_OCL::OCL::getOpenCL()->getCommandQueue());
+    TOCK(t); // Preconditioner apply time
   clEnqueueReadBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
                       A.clXv,
                       CL_TRUE,
@@ -154,6 +165,7 @@ static void ComputeSYMGS_OCL(SparseMatrix &A, const Vector &r, Vector &x) {
                       nrow * sizeof(double),
                       (void *)x.values,
                       0, NULL, NULL);
+  *dur+=t;
 }
 
 static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) {
@@ -205,15 +217,14 @@ static void ComputeSYMGS_CPU(const SparseMatrix &A, const Vector &r, Vector &x) 
   }
 }
 
-int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x) {
+int ComputeSYMGS(const SparseMatrix &A, const Vector &r, Vector &x, double * dur) {
   // This line and the next two lines should be removed and your version of ComputeSYMGS should be used.
   assert(x.localLength == A.localNumberOfColumns); // Make sure x contain space for halo values
 #ifndef HPCG_NO_MPI
   ExchangeHalo(A, x);
 #endif
-
 #ifdef __OCL__
-  ComputeSYMGS_OCL((SparseMatrix &)A, r, x);
+  ComputeSYMGS_OCL((SparseMatrix &)A, r, x, dur);
 #else
   ComputeSYMGS_CPU(A, r, x);
 #endif

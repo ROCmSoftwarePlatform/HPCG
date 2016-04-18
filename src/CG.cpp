@@ -256,13 +256,13 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
   cl_kernel kernelAlpha = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
 
   for (int k = 1; k <= max_iter && normr / normr0 > tolerance; k++) {
-    TICK();
+//    TICK();
     if (doPreconditioning) {
-      ComputeMG(A, A_ref, r, z);  // Apply preconditioner
+      ComputeMG(A, A_ref, r, z, &t5);  // Apply preconditioner
     } else {
       CopyVector(r, z);  // copy r to z (no preconditioning)
     }
-    TOCK(t5); // Preconditioner apply time
+//    TOCK(t5); // Preconditioner apply time
 
     clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A.d_b.values, CL_TRUE, 0,
                          A.d_A.num_rows * sizeof(double), z.values, 0, NULL, NULL);
