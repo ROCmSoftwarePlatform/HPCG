@@ -57,7 +57,6 @@ int ComputeDotProduct_OCL(cldenseVector &x, cldenseVector &y,
   int cl_status = CL_SUCCESS;
   clGetDeviceInfo(HPCG_OCL::OCL::getOpenCL()->getDeviceId(), CL_DEVICE_MAX_WORK_GROUP_SIZE,
                   sizeof(max_local_size), &max_local_size, NULL);
-  max_local_size /= 32;
   num_groups = (x.num_values / 4) / max_local_size;
   output_vec = (double*) malloc(num_groups * sizeof(double));
 
