@@ -57,6 +57,7 @@ int ComputeDotProduct_OCL(cldenseVector &x, cldenseVector &y,
   int cl_status = CL_SUCCESS;
   clGetDeviceInfo(HPCG_OCL::OCL::getOpenCL()->getDeviceId(), CL_DEVICE_MAX_WORK_GROUP_SIZE,
                   sizeof(max_local_size), &max_local_size, NULL);
+  max_local_size /= 32;
   num_groups = (x.num_values / 4) / max_local_size;
   output_vec = (double*) malloc(num_groups * sizeof(double));
 
@@ -94,10 +95,11 @@ int ComputeDotProduct_OCL(cldenseVector &x, cldenseVector &y,
 
   clSetKernelArg(kernel_add, 0, sizeof(cl_mem), &DotKernel::output_buffer);
   clSetKernelArg(kernel_add, 1, sizeof(cl_mem), &r.value);
+  for(size_t aval_size = num_groups; aval_size > 1; aval_size /= max_local_size)
   {
-    size_t local_size_ = num_groups < max_local_size ? num_groups : max_local_size;
+    size_t local_size_ = aval_size < max_local_size ? aval_size : max_local_size;
     clSetKernelArg(kernel_add, 2, local_size_ * sizeof(double), NULL);
-    global_size = num_groups;
+    global_size = aval_size;
     cl_status = clEnqueueNDRangeKernel(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(),
                                        kernel_add,
                                        1,

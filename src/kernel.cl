@@ -116,22 +116,17 @@ __kernel void dot_add(__global double* output, __global double* r,
    int gid = get_global_id(0);
    int lid = get_local_id(0);
    int group_size = get_local_size(0);
-   int global_size = get_global_size(0);
-   for(; global_size > 1; global_size /= group_size) {
-       partial_dot[lid] = output[gid];
-       barrier(CLK_LOCAL_MEM_FENCE);
-       output[gid] = 0.0;
-       for(int i = group_size/2; i>0; i >>= 1) {
-          if(lid < i) {
-             partial_dot[lid] += partial_dot[lid + i];
-          }
-          barrier(CLK_LOCAL_MEM_FENCE);
-       }
-
-       if(lid == 0) {
-           output[get_group_id(0)] = partial_dot[0];
-           if(gid == 0)
-               *r = output[0];
-       }
+   partial_dot[lid] = output[gid];
+   barrier(CLK_LOCAL_MEM_FENCE);
+   output[gid] = 0.0;
+   for(int i = group_size/2; i>0; i >>= 1) {
+      if(lid < i) {
+         partial_dot[lid] += partial_dot[lid + i];
+      }
+      barrier(CLK_LOCAL_MEM_FENCE);
+   }
+   if(lid == 0) {
+       output[get_group_id(0)] = partial_dot[0];
+       if(gid == 0) *r = output[0];
    }
 }
