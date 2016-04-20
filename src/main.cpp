@@ -166,8 +166,10 @@ int main(int argc, char *argv[]) {
   for (int level = 1; level < numberOfMgLevels; ++level) {
     GenerateCoarseProblem(*curLevelMatrix);
     curLevelMatrix = curLevelMatrix->Ac; // Make the just-constructed coarse grid the next level
+    curLevelMatrix->level = level;
     GenerateCoarseProblem(*curLevelMatrix_ref);
     curLevelMatrix_ref = curLevelMatrix_ref->Ac; // Make the just-constructed coarse grid the next level
+    curLevelMatrix_ref->level = level;
   }
 
   setup_time = mytimer() - setup_time; // Capture total time of setup
@@ -186,8 +188,9 @@ int main(int argc, char *argv[]) {
   }
 
 
-  CGData data;
+  CGData data,data_ref;
   InitializeSparseCGData(A, data);
+  InitializeSparseCGData(A_ref, data_ref);
 
   ////////////////////////////////////
   // Reference SpMV+MG Timing Phase //
@@ -270,6 +273,14 @@ int main(int argc, char *argv[]) {
   clsparse_setup(A);
   A.optimizationData = &A_ref;
   OptimizeProblem(&A);
+
+  /* Call Mgdata_copy to copy the necessary MgData values from A to A_ref according
+  to the coloring order*/
+  Mgdata_copy(A, A_ref);
+  Mgdata_copy(*A.Ac, *A_ref.Ac);
+  Mgdata_copy(*A.Ac->Ac, *A_ref.Ac->Ac);
+  Mgdata_copy(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+  
 #ifdef __OCL__
   HPCG_OCL::OCL::getOpenCL()->initBuffer(A);
 #endif

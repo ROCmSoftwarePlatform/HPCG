@@ -111,13 +111,23 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
   for (int level = 1; level< 4; ++level) {
     GenerateCoarseProblem(*curLevelMatrix_ref);
     curLevelMatrix_ref = curLevelMatrix_ref->Ac; // Make the just-constructed coarse grid the next level
+    curLevelMatrix_ref->level = level;
   }
+  CGData data_ref;
+  InitializeSparseCGData(A_ref, data_ref);
 
   /* call OptimizeProblem to all grid levels so the reference matrix is reordered
   based on Luby's color reordering algorithm*/
   void * optimizationData = A.optimizationData;
   A.optimizationData = &A_ref;
   OptimizeProblem(&A);
+
+  /* Call Mgdata_copy to copy the necessary MgData values from A to A_ref according
+  to the coloring order*/
+  Mgdata_copy(A, A_ref);
+  Mgdata_copy(*A.Ac, *A_ref.Ac);
+  Mgdata_copy(*A.Ac->Ac, *A_ref.Ac->Ac);
+  Mgdata_copy(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
 #ifdef __OCL__
   HPCG_OCL::OCL::getOpenCL()->initBuffer(A);
 #endif

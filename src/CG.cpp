@@ -255,10 +255,42 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
   cl_kernel kernelBeta = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeBeta"));
   cl_kernel kernelAlpha = HPCG_OCL::OCL::getOpenCL()->getKernel(std::string("computeAlpha"));
 
+ //Create r_copy and z_copy to copy r and z vectors respectively.
+  Vector r_copy;
+  r_copy.values = new double[A.localNumberOfRows];
+  Vector z_copy;
+  z_copy.values = new double[A.localNumberOfRows];
+  
   for (int k = 1; k <= max_iter && normr / normr0 > tolerance; k++) {
     TICK();
     if (doPreconditioning) {
-      ComputeMG(A, A_ref, r, z);  // Apply preconditioner
+      // Rearrange r_copy and z_copy according to the color ordering.
+      for(int i = 0; i < A.localNumberOfRows; i++)
+      {
+        r_copy.values[i] = r.values[A_ref.colors[i]];
+        z_copy.values[i] = z.values[A_ref.colors[i]];
+      }
+      r_copy.localLength = r.localLength;
+      z_copy.localLength = z.localLength;
+
+      // Call ComputeMG with reordered r_copy, z_copy and reference sparse matrix.
+      ComputeMG(A_ref, r_copy, z_copy); // Apply preconditioner
+      
+      /* Restore the z_ncol vector from z_copy. Restore back the MgData from reference sparse matrix 
+      to A matrix. */
+      if(A.level != 3)
+      {
+        for(int i = 0; i < A.localNumberOfRows; i++)
+        {
+             z.values[A_ref.colors[i]] = z_copy.values[i];
+             A.mgData->Axf->values[A_ref.colors[i]] = A_ref.mgData->Axf->values[i];
+        }
+        for(int i = 0; i <A.mgData->rc->localLength; i++)
+        {
+           A.mgData->rc->values[A_ref.Ac->colors[i]] = A_ref.mgData->rc->values[i];
+           A.mgData->xc->values[A_ref.Ac->colors[i]] = A_ref.mgData->xc->values[i];
+        }
+      }
     } else {
       CopyVector(r, z);  // copy r to z (no preconditioning)
     }

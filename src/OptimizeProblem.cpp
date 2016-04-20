@@ -47,6 +47,7 @@ void free_refmatrix_m(SparseMatrix &A) {
   for (int i = 0 ; i < A.localNumberOfRows; i++) {
     delete [] A.matrixValues[i];
     delete [] A.mtxIndL[i];
+    delete [] A.mtxIndG[i];
   }
 
 #ifdef __OCL__
@@ -435,6 +436,24 @@ int OptimizeProblem(const SparseMatrix *A_) {
     Ac_ref = Ac_ref->Ac;
   }
   return 0;
+}
+
+void Mgdata_copy(SparseMatrix &A, SparseMatrix &A_ref)
+{
+ // Copy Axf, rc and xc values from A to A_ref according to the color ordering.
+  if(A.level != 3)
+  {
+    for(int i = 0; i <A.mgData->Axf->localLength; i++)
+    {
+       A_ref.mgData->Axf->values[i] =  A.mgData->Axf->values[A_ref.colors[i]];
+    }
+    for(int i = 0; i < A.mgData->rc->localLength; i++)
+    {
+       A_ref.mgData->rc->values[i] =  A.mgData->rc->values[A_ref.Ac->colors[i]];
+       A_ref.mgData->xc->values[i] =  A.mgData->xc->values[A_ref.Ac->colors[i]];
+     
+    }
+  }
 }
 
 // Helper function (see OptimizeProblem.hpp for details)

@@ -55,6 +55,7 @@ struct SparseMatrix_STRUCT {
   mutable bool isWaxpbyOptimized;
   std::vector<local_int_t> colors; //  save the reordered row index.
   std::vector<local_int_t> counters; // save the color offset.
+  int level;
   /*!
    This is for storing optimized data structres created in OptimizeProblem and
    used inside optimized ComputeSPMV().
@@ -118,7 +119,7 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.mtxIndL = 0;
   A.matrixValues = 0;
   A.matrixDiagonal = 0;
-
+  A.level = 0;
   // Optimization is ON by default. The code that switches it OFF is in the
   // functions that are meant to be optimized.
   A.isDotProductOptimized = true;
