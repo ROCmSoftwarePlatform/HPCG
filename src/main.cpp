@@ -254,12 +254,45 @@ int main(int argc, char * argv[]) {
   // Call user-tunable set up function.
   double t7 = mytimer();
 
+  Vector origDiagA, temp;
+  InitializeVector(origDiagA, A.localNumberOfRows);
+  InitializeVector(temp, A.localNumberOfRows);
+  CopyMatrixDiagonal(A, origDiagA);
+  CopyMatrixDiagonal(A, temp);
+    
+  for (local_int_t i=0; i< A.localNumberOfRows; ++i) {
+    global_int_t globalRowID = A.localToGlobalMap[i];
+    if (globalRowID<9) {
+      double scale = (globalRowID+2)*1.0e6;
+      ScaleVectorValue(temp, i, scale);
+    } 
+  }
+    
+  ReplaceMatrixDiagonal(A, temp);
+
   /* call OptimizeProblem to all grid levels so the reference matrix is reordered 
   based on Luby's color reordering algorithm*/
   OptimizeProblem(A, A_ref);
   OptimizeProblem(*A.Ac, *A_ref.Ac);
   OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
   OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+
+  CopyMatrixDiagonal(A_ref, temp);
+  
+  TestCGData testcg_data;
+  
+  int k = 0;
+  for(int i = 0; i < A_ref.localNumberOfRows; i++)
+  {
+    if (temp.values[i] != 26)
+    {
+      testcg_data.scaleIndex[k] = i;
+      testcg_data.scaleVal[k++] = temp.values[i];
+    }
+  }
+    
+  ReplaceMatrixDiagonal(A, origDiagA);
+  ReplaceMatrixDiagonal(A_ref, origDiagA);  
 
   t7 = mytimer() - t7;
   times[7] = t7;
@@ -279,9 +312,9 @@ int main(int argc, char * argv[]) {
 #ifdef HPCG_DEBUG
   t1 = mytimer();
 #endif
-  TestCGData testcg_data;
+  
   testcg_data.count_pass = testcg_data.count_fail = 0;
-  TestCG(A, geom, data, b, x, testcg_data);
+  TestCG(A, A_ref, geom, data, b, x, testcg_data);
 
   TestSymmetryData testsymmetry_data;
   TestSymmetry(A, A_ref, b, xexact, testsymmetry_data);
@@ -397,6 +430,8 @@ int main(int argc, char * argv[]) {
   DeleteVector(x);
   DeleteVector(b);
   DeleteVector(xexact);
+  DeleteVector(origDiagA);
+  DeleteVector(temp);
   DeleteVector(x_overlap);
   DeleteVector(b_computed);
   delete [] testnorms_data.values;

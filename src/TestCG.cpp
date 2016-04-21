@@ -54,18 +54,23 @@ using std::endl;
 
   @see CG()
  */
-int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data) {
+int TestCG(SparseMatrix & A, SparseMatrix & A_ref, Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data) {
 
 
   // Use this array for collecting timing information
   std::vector< double > times(8,0.0);
   // Temporary storage for holding original diagonal and RHS
-  Vector origDiagA, exaggeratedDiagA, origB;
+  Vector origDiagA, origDiagA_ref, exaggeratedDiagA, exaggeratedDiagA_ref, origB;
   InitializeVector(origDiagA, A.localNumberOfRows);
+  InitializeVector(origDiagA_ref, A_ref.localNumberOfRows);
   InitializeVector(exaggeratedDiagA, A.localNumberOfRows);
+  InitializeVector(exaggeratedDiagA_ref, A_ref.localNumberOfRows);
   InitializeVector(origB, A.localNumberOfRows);
+  
   CopyMatrixDiagonal(A, origDiagA);
+  CopyMatrixDiagonal(A_ref, origDiagA_ref);
   CopyVector(origDiagA, exaggeratedDiagA);
+  CopyVector(origDiagA_ref, exaggeratedDiagA_ref);
   CopyVector(b, origB);
 
   // Modify the matrix diagonal to greatly exaggerate diagonal values.
@@ -81,7 +86,15 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
       ScaleVectorValue(b, i, 1.0e6);
     }
   }
+  
+  for (local_int_t i=0; i< A_ref.localNumberOfRows; ++i) 
+    ScaleVectorValue(exaggeratedDiagA_ref, i, 1.0e6);
+  
+  for(int i = 0; i < 9; i++)
+    exaggeratedDiagA_ref.values[testcg_data.scaleIndex[i]] = testcg_data.scaleVal[i];
+  
   ReplaceMatrixDiagonal(A, exaggeratedDiagA);
+  ReplaceMatrixDiagonal(A_ref, exaggeratedDiagA_ref);
 
   int niters = 0;
   double normr = 0.0;
@@ -93,27 +106,6 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
   testcg_data.expected_niters_prec = 2;   // For the preconditioned case, we should take about 1 iteration, permit 2
   testcg_data.niters_max_no_prec = 0;
   testcg_data.niters_max_prec = 0;
- 
-  // Reference matrix to store reordered sparse matrix depending on Luby's coloring order.
-  SparseMatrix A_ref;
-  InitializeSparseMatrix(A_ref, geom);
-
-  //Allocate and create coarse levels for reference sparse matrix
-  Vector bc, xc, xexactc;
-  GenerateProblem(A_ref, &bc, &xc, &xexactc);
-
-  SparseMatrix * curLevelMatrix_ref = &A_ref;
-  for (int level = 1; level< 4; ++level) {
-    GenerateCoarseProblem(*curLevelMatrix_ref);
-    curLevelMatrix_ref = curLevelMatrix_ref->Ac; // Make the just-constructed coarse grid the next level
-  }
-
-  /* call OptimizeProblem to all grid levels so the reference matrix is reordered 
-  based on Luby's color reordering algorithm*/
-  OptimizeProblem(A, A_ref);
-  OptimizeProblem(*A.Ac, *A_ref.Ac);
-  OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
-  OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
 
   for (int k=0; k<2; ++k) { // This loop tests both unpreconditioned and preconditioned runs
     int expected_niters = testcg_data.expected_niters_no_prec;
@@ -141,14 +133,15 @@ int TestCG(SparseMatrix & A, Geometry * geom, CGData & data, Vector & b, Vector 
 
   // Restore matrix diagonal and RHS
   ReplaceMatrixDiagonal(A, origDiagA);
+  ReplaceMatrixDiagonal(A_ref, origDiagA_ref);
   CopyVector(origB, b);
   // Delete vectors
   DeleteVector(origDiagA); 
+  DeleteVector(origDiagA_ref); 
   DeleteVector(exaggeratedDiagA);
+  DeleteVector(exaggeratedDiagA_ref);
   DeleteVector(origB);
   testcg_data.normr = normr;
-
-  //free the reference sparse matrix
-  free_refmatrix_m(A_ref);
+  
   return 0;
 }

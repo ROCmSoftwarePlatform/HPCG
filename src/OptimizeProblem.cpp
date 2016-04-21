@@ -464,31 +464,28 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   #endif
   for(int i = 0; i < nrow; i++)
   {   
-	   //const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
+	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
      A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
-	   //const double * const currentValues = A.matrixValues[A_ref.colors[i]];
-	   //const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
+	   const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
 
-	   //double * diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
-	   A_ref.matrixDiagonal[i] = A.matrixDiagonal[A_ref.colors[i]];
-  
 		//rearrange the elements in the row
-     /*int col_indx = 0;
+     int col_indx = 0;
      #ifndef HPCG_NO_OPENMP
       #pragma omp parallel for
-     #endif*/
-     /*for(int k = 0; k < nrow; k++)
+     #endif
+     for(int k = 0; k < nrow; k++)
      {
 	      for(int j = 0; j < currentNumberOfNonzeros; j++)
 	      {		
 		       if(A_ref.colors[k] == currentColIndices[j])
 		       {
-			        A_ref.matrixValues[i][col_indx] = currentValues[j];
-			        A_ref.mtxIndL[i][col_indx++] = k;
+			        if(A_ref.colors[i] == currentColIndices[j])
+                A_ref.matrixDiagonal[i] = &A_ref.matrixValues[i][col_indx];
+              col_indx++;
 			        break;
    	       }	
         }
-     }*/
+     }
   }
  
  
