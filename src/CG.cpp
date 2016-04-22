@@ -59,7 +59,7 @@
 
   @see CG_ref()
 */
-int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector & b, Vector & x,
+int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
     const int max_iter, const double tolerance, int & niters, double & normr, double & normr0,
     double * times, bool doPreconditioning) {
 
@@ -103,7 +103,7 @@ int CG(const SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector 
   for (int k=1; k<=max_iter && normr/normr0 > tolerance; k++ ) {
     TICK();
     if (doPreconditioning)
-      ComputeMG(A, A_ref, r, z); // Apply preconditioner
+      ComputeMG(A, r, z); // Apply preconditioner
     else
       CopyVector (r, z); // copy r to z (no preconditioning)
     TOCK(t5); // Preconditioner apply time

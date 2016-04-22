@@ -58,7 +58,7 @@ using std::endl;
   @see ComputeMG
   @see ComputeMG_ref
 */
-int TestSymmetry(SparseMatrix & A, SparseMatrix &A_ref, Vector & b, Vector & xexact, TestSymmetryData & testsymmetry_data) {
+int TestSymmetry(SparseMatrix & A, Vector & b, Vector & xexact, TestSymmetryData & testsymmetry_data) {
 
  local_int_t nrow = A.localNumberOfRows;
  local_int_t ncol = A.localNumberOfColumns;
@@ -103,7 +103,7 @@ int TestSymmetry(SparseMatrix & A, SparseMatrix &A_ref, Vector & b, Vector & xex
  // Test symmetry of symmetric Gauss-Seidel
 
  // Compute x'*Minv*y
- ierr = ComputeMG(A, A_ref, y_ncol, z_ncol); // z_ncol = Minv*y_ncol
+ ierr = ComputeMG(A, y_ncol, z_ncol); // z_ncol = Minv*y_ncol
 
  if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
  double xtMinvy = 0.0;
@@ -111,7 +111,7 @@ int TestSymmetry(SparseMatrix & A, SparseMatrix &A_ref, Vector & b, Vector & xex
  if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
 
  // Next, compute z'*Minv*x
- ierr = ComputeMG(A, A_ref, x_ncol, z_ncol); // z_ncol = Minv*x_ncol
+ ierr = ComputeMG(A, x_ncol, z_ncol); // z_ncol = Minv*x_ncol
 
  if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
  double ytMinvx = 0.0;

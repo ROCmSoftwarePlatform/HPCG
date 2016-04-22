@@ -37,27 +37,23 @@ int row ;
 */
 
 // free the reference matrix
-void free_refmatrix_m(SparseMatrix &A)
-{
-  for(int i =0 ; i < A.localNumberOfRows; i++)
-  {
+void free_refmatrix_m(SparseMatrix &A){
+  for(int i =0 ; i < A.localNumberOfRows; i++){
     delete [] A.matrixValues[i];
     delete [] A.mtxIndL[i];
+    delete [] A.mtxIndG[i];
   }
 }
 
 // luby's graph coloring algorthim - nvidia's approach
 
-void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<local_int_t> &colors,int *random,std::vector<local_int_t> &temp)
-{
-    for(int i=0;i<row;i++)
-    {
+void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<local_int_t> &colors,int *random,std::vector<local_int_t> &temp){
+    for(int i=0;i<row;i++){
        int flag = 1;
        if(colors[i] != -1)
           continue;
        int ir = random[i];
-       for(int k=row_offset[i];k<row_offset[i+1];k++)
-       {
+       for(int k=row_offset[i];k<row_offset[i+1];k++){
           int j = col_index[k];
           int jc = colors[j];
           if (((jc != -1) && (jc != c)) || (i == j)) 
@@ -66,8 +62,7 @@ void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<loc
           if(ir <= jr)
             flag = 0;
        }
-       if(flag)
-       {
+       if(flag){
         colors[i] = c;
        }
         
@@ -87,8 +82,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
 
  // Initialize local Color array and random array using rand functions.
   srand(1459166450);
-  for (int i = 0; i < nrow; i++)
-  {
+  for (int i = 0; i < nrow; i++){
       random[i] = rand(); 
   }
   row_offset[0] = 0;
@@ -96,10 +90,8 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
 
   int k = 0;
   // Save the mtxIndL in a single dimensional array for column index reference.
-  for(int i = 0; i < nrow; i++)
-  {
-    for(int j = 0; j < A.nonzerosInRow[i]; j++)
-    {
+  for(int i = 0; i < nrow; i++){
+    for(int j = 0; j < A.nonzerosInRow[i]; j++){
         col_index[k] = A.mtxIndL[i][j];
         k++;
     }
@@ -110,8 +102,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   // Calculate the row offset.
   int ridx = 1;
   int sum = 0;
-  for(int i = 0; i < nrow; i++)
-  {
+  for(int i = 0; i < nrow; i++){
      sum =  sum + A.nonzerosInRow[i];
      row_offset[ridx] = sum;
      ridx++;
@@ -119,8 +110,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
 
   // Call luby's graph coloring algorithm. 
   int c = 0;
-  for( c = 0; c < nrow; c++)
-  {
+  for( c = 0; c < nrow; c++){
 
       lubys_graph_coloring(c,row_offset,col_index,A_ref.colors,random,temp);
       int left = std::count(A_ref.colors.begin(), A_ref.colors.end(), -1);
@@ -132,14 +122,13 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   std::vector<local_int_t> counters(c+2);
   A_ref.counters.resize(c+2);
   std::fill(counters.begin(), counters.end(), 0);
-  for (local_int_t i = 0; i < nrow; ++i)
-  {
+  for (local_int_t i = 0; i < nrow; ++i){
     counters[A_ref.colors[i]]++;
   }
 
   // Calculate color offset using counter vector. 
   local_int_t old = 0 , old0 = 0;
-  for (int i = 1; i <= c + 1; ++i) {
+  for (int i = 1; i <= c + 1; ++i){
     old0 = counters[i];
     counters[i] = counters[i-1] + old;
     old = old0;
@@ -154,12 +143,9 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   // translate `colors' into a permutation.
   std::vector<local_int_t> colors(nrow);
   int k1 = 0;
-  for(int i = 0; i < c+1; i++)
-  {
-      for(int j = 0; j < nrow; j++)
-      {
-          if(A_ref.colors[j] == i)
-          {
+  for(int i = 0; i < c+1; i++){
+      for(int j = 0; j < nrow; j++){
+          if(A_ref.colors[j] == i){
               colors[k1] = j;
               k1++;
           }
@@ -172,40 +158,51 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   #ifndef HPCG_NO_OPENMP
     #pragma omp parallel for
   #endif
-for(int i = 0; i < nrow; i++)
-  {   
-	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
-     A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
-	   const double * const currentValues = A.matrixValues[A_ref.colors[i]];
-	   const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
+for(int i = 0; i < nrow; i++){   
+  const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
+  A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
+  const double * const currentValues = A.matrixValues[A_ref.colors[i]];
+  const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
 
-	   double * diagonalValue = A.matrixDiagonal[A_ref.colors[i]];
-	   A_ref.matrixDiagonal[i] = diagonalValue;
-  
-		//rearrange the elements in the row
-     int col_indx = 0;
-     #ifndef HPCG_NO_OPENMP
-      #pragma omp parallel for
-     #endif
-     for(int k = 0; k < nrow; k++)
-     {
-	      for(int j = 0; j < currentNumberOfNonzeros; j++)
-	      {		
-		       if(A_ref.colors[k] == currentColIndices[j])
-		       {
-			        A_ref.matrixValues[i][col_indx] = currentValues[j];
-			        A_ref.mtxIndL[i][col_indx++] = k;
-			        break;
-   	       }	
-        }
-     }
+  //rearrange the elements in the row
+  int col_indx = 0;
+  #ifndef HPCG_NO_OPENMP
+  #pragma omp parallel for
+  #endif
+  for(int k = 0; k < nrow; k++){
+    for(int j = 0; j < currentNumberOfNonzeros; j++){
+      if(A_ref.colors[k] == currentColIndices[j]){
+        A_ref.matrixValues[i][col_indx] = currentValues[j];
+        A_ref.mtxIndL[i][col_indx] = k;
+        if(A_ref.colors[i] == currentColIndices[j])
+          A_ref.matrixDiagonal[i] = &A_ref.matrixValues[i][col_indx];
+        col_indx++;
+        break;
+      }
+    }
   }
+}
  
   delete [] row_offset;
   delete [] col_index;
   delete [] random;
 
   return 0;
+}
+
+// store the mgdata values in reference vector according to the coloring order
+void Mgdata_copy(SparseMatrix &A, SparseMatrix &A_ref) {
+ // Copy Axf, rc and xc values from A to A_ref according to the color ordering.
+  if(A.level != 3) {
+    for(int i = 0; i <A.mgData->Axf->localLength; i++) {
+       A_ref.mgData->Axf->values[i] =  A.mgData->Axf->values[A_ref.colors[i]];
+    }
+    for(int i = 0; i < A.mgData->rc->localLength; i++) {
+       A_ref.mgData->rc->values[i] =  A.mgData->rc->values[A_ref.Ac->colors[i]];
+       A_ref.mgData->xc->values[i] =  A.mgData->xc->values[A_ref.Ac->colors[i]];
+     
+    }
+  }
 }
 
 // Helper function (see OptimizeProblem.hpp for details)
