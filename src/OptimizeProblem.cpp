@@ -395,8 +395,6 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
     Count[qt_mtxIndl[i]]++;
   }
   
-  
-  
   /* CSR Matrix */  
   /* A */  
   k = 0;
@@ -409,19 +407,10 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
      for(int j = 0; j < A.nonzerosInRow[i]; j++)
      {
        col[k] = A.mtxIndL[i][j];
-       k++;
-     }
-  }       
-  
-  k = 0;
-  for(int i = 0; i < A.totalNumberOfRows; i++) 
-  {
-     for(int j = 0; j < A.nonzerosInRow[i]; j++)
-     {
        val[k] = (float)A.matrixValues[i][j];
        k++;
      }
-  }            
+  }              
                
   clEnqueueWriteBuffer(command_queue, d_A.values, CL_TRUE, 0,
                               d_A.num_nonzeros * sizeof( float ), val, 0, NULL, NULL ); 
@@ -463,32 +452,8 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
     #pragma omp parallel for
   #endif
   for(int i = 0; i < nrow; i++)
-  {   
-	   const int currentNumberOfNonzeros = A.nonzerosInRow[A_ref.colors[i]];
-     A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
-	   const local_int_t * const currentColIndices = A.mtxIndL[A_ref.colors[i]];
-
-		//rearrange the elements in the row
-     int col_indx = 0;
-     #ifndef HPCG_NO_OPENMP
-      #pragma omp parallel for
-     #endif
-     for(int k = 0; k < nrow; k++)
-     {
-	      for(int j = 0; j < currentNumberOfNonzeros; j++)
-	      {		
-		       if(A_ref.colors[k] == currentColIndices[j])
-		       {
-			        if(A_ref.colors[i] == currentColIndices[j])
-                A_ref.matrixDiagonal[i] = &A_ref.matrixValues[i][col_indx];
-              col_indx++;
-			        break;
-   	       }	
-        }
-     }
-  }
- 
- 
+    A_ref.nonzerosInRow[i] = A.nonzerosInRow[A_ref.colors[i]];
+	   
   /* Copy back A_ref values and col indices */
   k = 0;
   for(int i = 0; i < A_ref.totalNumberOfRows; i++) 
@@ -496,19 +461,12 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
      for(int j = 0; j < A_ref.nonzerosInRow[i]; j++)
      {
        A_ref.matrixValues[i][j] = (double)val[k];
-       k++;
-     }
-  }  
-  
-  k = 0;
-  for(int i = 0; i < A_ref.totalNumberOfRows; i++) 
-  {
-     for(int j = 0; j < A_ref.nonzerosInRow[i]; j++)
-     {
        A_ref.mtxIndL[i][j] = col[k];
+       if (i == A_ref.mtxIndL[i][j])
+         A_ref.matrixDiagonal[i] = &A_ref.matrixValues[i][j];
        k++;
      }
-  }          
+  }       
   
   delete [] row_offset;
   delete [] col_index;
