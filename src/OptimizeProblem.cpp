@@ -30,7 +30,7 @@ int row;
 
 int call_count;
 float *val, *qt_matrixValues;
-int *col, *rowOff, *nnzInRow, *Count;
+int *nnzInRow, *Count;
 local_int_t *qt_mtxIndl, *qt_rowOffset, *q_mtxIndl, *q_rowOffset;
 
 cl_platform_id *platform;
@@ -114,10 +114,7 @@ int clsparse_setup()
 
 int mem_alloc(SparseMatrix A)
 {
-  val = new float[A.totalNumberOfNonzeros];
-  col = new int[A.totalNumberOfNonzeros];
-  rowOff = new int[A.localNumberOfRows + 1];  
-  
+  val = new float[A.totalNumberOfNonzeros];  
   nnzInRow = new int[A.localNumberOfRows]();
   Count = new int[A.localNumberOfRows]();
   
@@ -215,7 +212,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   int *random = new int [nrow];
   std::vector<local_int_t> temp(nrow, -1);
   int *row_offset,*col_index;
-  col_index = new int [nrow * 27];
+  col_index = new int [A.totalNumberOfNonzeros];
   row_offset = new int [(nrow + 1)];
 
  // Initialize local Color array and random array using rand functions.
@@ -328,8 +325,6 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   }
 
 
-
-
 /*
   
   // take transpose for qt such that " q = transpose(qt)"
@@ -378,7 +373,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
     mem_alloc(A);
     ++call_count;
   }
-
+  
 
   /* Transpose */  
  
@@ -397,27 +392,18 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
   
   /* CSR Matrix */  
   /* A */  
-  k = 0;
-  rowOff[0] = 0;
-  for(int i = 1; i <= A.totalNumberOfRows; i++)
-    rowOff[i] = rowOff[i - 1] + A.nonzerosInRow[i - 1];
-    
-  for(int i = 0; i < A.totalNumberOfRows; i++) 
-  {
-     for(int j = 0; j < A.nonzerosInRow[i]; j++)
-     {
-       col[k] = A.mtxIndL[i][j];
-       val[k] = (float)A.matrixValues[i][j];
-       k++;
-     }
-  }              
+  k = 0;  
+  for(int i = 0; i < A.totalNumberOfRows; i++)
+    for(int j = 0; j < A.nonzerosInRow[i]; j++)
+      val[k++] = (float)A.matrixValues[i][j];
+      
                
   clEnqueueWriteBuffer(command_queue, d_A.values, CL_TRUE, 0,
                               d_A.num_nonzeros * sizeof( float ), val, 0, NULL, NULL ); 
   clEnqueueWriteBuffer(command_queue, d_A.col_indices, CL_TRUE, 0,
-                              d_A.num_nonzeros * sizeof( clsparseIdx_t ), col, 0, NULL, NULL ); 
+                              d_A.num_nonzeros * sizeof( clsparseIdx_t ), col_index, 0, NULL, NULL ); 
   clEnqueueWriteBuffer(command_queue, d_A.row_pointer, CL_TRUE, 0,
-                              (d_A.num_rows + 1) * sizeof( clsparseIdx_t ), rowOff, 0, NULL, NULL );  
+                              (d_A.num_rows + 1) * sizeof( clsparseIdx_t ), row_offset, 0, NULL, NULL );  
                               
   /* Qt */
   clEnqueueWriteBuffer(command_queue, d_Qt.values, CL_TRUE, 0,
@@ -444,7 +430,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
                               d_A_ref.num_nonzeros * sizeof(float), val, 0, NULL, NULL );
                                                                                                                                      
   clEnqueueReadBuffer(command_queue, d_A_ref.col_indices, CL_TRUE, 0,
-                              d_A_ref.num_nonzeros * sizeof(clsparseIdx_t ), col, 0, NULL, NULL );    
+                              d_A_ref.num_nonzeros * sizeof(clsparseIdx_t ), col_index, 0, NULL, NULL );    
                                                                
   
   // Rearranges the reference matrix according to the coloring index.
@@ -461,7 +447,7 @@ int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref) {
      for(int j = 0; j < A_ref.nonzerosInRow[i]; j++)
      {
        A_ref.matrixValues[i][j] = (double)val[k];
-       A_ref.mtxIndL[i][j] = col[k];
+       A_ref.mtxIndL[i][j] = col_index[k];
        if (i == A_ref.mtxIndL[i][j])
          A_ref.matrixDiagonal[i] = &A_ref.matrixValues[i][j];
        k++;

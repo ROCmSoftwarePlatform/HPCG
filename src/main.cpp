@@ -476,9 +476,7 @@ int main(int argc, char * argv[]) {
   cl_status = clReleaseContext(context);
   assert(cl_status == CL_SUCCESS && "Release context failed\n");
   
-  delete [] col;
   delete [] val;
-  delete [] rowOff;
   delete [] nnzInRow;
   delete [] Count;
   delete [] qt_matrixValues;
