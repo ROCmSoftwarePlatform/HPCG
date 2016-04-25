@@ -38,6 +38,7 @@ using std::endl;
 #include "Geometry.hpp"
 #include "SparseMatrix.hpp"
 #include "TestSymmetry.hpp"
+#include "ComputeMG_ref.hpp"
 
 /*!
   Tests symmetry-preserving properties of the sparse matrix vector multiply and
@@ -58,7 +59,7 @@ using std::endl;
   @see ComputeMG
   @see ComputeMG_ref
 */
-int TestSymmetry(SparseMatrix & A, Vector & b, Vector & xexact, TestSymmetryData & testsymmetry_data) {
+int TestSymmetry(SparseMatrix & A, SparseMatrix &A_ref, Vector & b, Vector & xexact, TestSymmetryData & testsymmetry_data) {
 
  local_int_t nrow = A.localNumberOfRows;
  local_int_t ncol = A.localNumberOfColumns;
@@ -103,14 +104,62 @@ int TestSymmetry(SparseMatrix & A, Vector & b, Vector & xexact, TestSymmetryData
  // Test symmetry of symmetric Gauss-Seidel
 
  // Compute x'*Minv*y
- ierr = ComputeMG(A, y_ncol, z_ncol); // z_ncol = Minv*y_ncol
+ // Create r_copy and z_copy to copy y_ncol and z_ncol vectors respectively. Rearrange them according to the color ordering.
+  Vector r_copy;
+  r_copy.values = new double[A.localNumberOfRows];
+  Vector z_copy;
+  z_copy.values = new double[A.localNumberOfRows];
+
+  for(int i = 0; i < A.localNumberOfRows; i++)
+  {
+    r_copy.values[i] = y_ncol.values[A_ref.colors[i]];
+    z_copy.values[i] = z_ncol.values[A_ref.colors[i]];
+  }
+  r_copy.localLength = y_ncol.localLength;
+  z_copy.localLength = z_ncol.localLength;
+
+  // Call ComputeMG with reordered r_copy, z_copy and reference sparse matrix. 
+  ierr = ComputeMG(A_ref, r_copy, z_copy); // z_ncol = Minv*y_ncol
+
+  // Restore the z_ncol vector from z_copy. 
+  for(int i = 0; i < A_ref.localNumberOfRows; i++)
+  {
+    z_ncol.values[A_ref.colors[i]] = z_copy.values[i];
+  }
+
  if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
  double xtMinvy = 0.0;
  ierr = ComputeDotProduct(nrow, x_ncol, z_ncol, xtMinvy, t4, A.isDotProductOptimized); // x'*Minv*y
  if (ierr) HPCG_fout << "Error in call to dot: " << ierr << ".\n" << endl;
 
  // Next, compute z'*Minv*x
- ierr = ComputeMG(A, x_ncol, z_ncol); // z_ncol = Minv*x_ncol
+ // Use r_copy and z_copy to copy x_ncol and z_ncol vectors respectively. Rearrange them according to the color ordering.
+  for(int i = 0; i < A.localNumberOfRows; i++)
+  {
+    r_copy.values[i] = x_ncol.values[A_ref.colors[i]];
+    z_copy.values[i] = z_ncol.values[A_ref.colors[i]];
+  }
+  r_copy.localLength = x_ncol.localLength;
+  z_copy.localLength = z_ncol.localLength;
+
+ // Call ComputeMG with reordered r_copy, z_copy and reference sparse matrix. 
+ ierr = ComputeMG(A_ref, r_copy, z_copy); // z_ncol = Minv*x_ncol
+
+ /* Restore the z_ncol vector from z_copy. Restore back the MgData from reference sparse matrix 
+ to A matrix. */
+ if(A.level != 3)
+ {
+    for(int i = 0; i < A_ref.localNumberOfRows; i++)
+    {
+      z_ncol.values[A_ref.colors[i]] = z_copy.values[i];
+      A.mgData->Axf->values[A_ref.colors[i]] = A_ref.mgData->Axf->values[i];
+    }
+    for(int i = 0; i < A.mgData->rc->localLength; i++)
+    {
+      A.mgData->rc->values[A_ref.Ac->colors[i]] = A_ref.mgData->rc->values[i];
+      A.mgData->xc->values[A_ref.Ac->colors[i]] = A_ref.mgData->xc->values[i];
+    }
+ }
  if (ierr) HPCG_fout << "Error in call to MG: " << ierr << ".\n" << endl;
  double ytMinvx = 0.0;
  ierr = ComputeDotProduct(nrow, y_ncol, z_ncol, ytMinvx, t4, A.isDotProductOptimized); // y'*Minv*x

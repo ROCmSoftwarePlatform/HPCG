@@ -35,10 +35,12 @@ struct TestCGData_STRUCT {
   int niters_max_no_prec; //!< maximum number of test CG iterations without predictitioner
   int niters_max_prec; //!< maximum number of test CG iterations without predictitioner
   double normr; //!< residual norm achieved during test CG iterations
+  int scaleIndex[9], scaleVal[9]; // index and value of scaled diagonal
 };
 typedef struct TestCGData_STRUCT TestCGData;
 
-extern int TestCG(SparseMatrix & A, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data);
+//extern int TestCG(SparseMatrix & A, SparseMatrix &A_ref, Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data);
+extern int TestCG(SparseMatrix &A_ref, Geometry * geom, CGData & data, Vector & b, Vector & x, TestCGData & testcg_data);
 
 #endif  // TESTCG_HPP
 

@@ -24,6 +24,7 @@
 #include <map>
 #include <vector>
 #include <cassert>
+#include <iostream>
 #include "Geometry.hpp"
 #include "Vector.hpp"
 #include "MGData.hpp"
@@ -47,6 +48,8 @@ struct SparseMatrix_STRUCT {
   mutable bool isSpmvOptimized;
   mutable bool isMgOptimized;
   mutable bool isWaxpbyOptimized;
+  std::vector<local_int_t> colors; //  save the reordered row index.
+  std::vector<local_int_t> counters; // save the color offset.
   /*!
    This is for storing optimized data structres created in OptimizeProblem and
    used inside optimized ComputeSPMV().
@@ -54,6 +57,7 @@ struct SparseMatrix_STRUCT {
   mutable struct SparseMatrix_STRUCT * Ac; // Coarse grid matrix
   mutable MGData * mgData; // Pointer to the coarse level data for this fine matrix
   void * optimizationData;  // pointer that can be used to store implementation-specific data
+  int level;
 
 #ifndef HPCG_NO_MPI
   local_int_t numberOfExternalValues; //!< number of entries that are external to this process
@@ -64,6 +68,7 @@ struct SparseMatrix_STRUCT {
   local_int_t * receiveLength; //!< lenghts of messages received from neighboring processes
   local_int_t * sendLength; //!< lenghts of messages sent to neighboring processes
   double * sendBuffer; //!< send buffer for non-blocking sends
+
 #endif
 };
 typedef struct SparseMatrix_STRUCT SparseMatrix;
@@ -93,6 +98,7 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.isSpmvOptimized       = true;
   A.isMgOptimized      = true;
   A.isWaxpbyOptimized     = true;
+  A.level = 0;
 
 #ifndef HPCG_NO_MPI
   A.numberOfExternalValues = 0;
@@ -165,7 +171,8 @@ inline void DeleteMatrix(SparseMatrix & A) {
 
   if (A.geom!=0) { delete A.geom; A.geom = 0;}
   if (A.Ac!=0) { DeleteMatrix(*A.Ac); delete A.Ac; A.Ac = 0;} // Delete coarse matrix
-  if (A.mgData!=0) { DeleteMGData(*A.mgData); delete A.mgData; A.mgData = 0;} // Delete MG data
+  if (A.mgData!=0) {
+   DeleteMGData(*A.mgData); delete A.mgData; A.mgData = 0;} // Delete MG data
   return;
 }
 

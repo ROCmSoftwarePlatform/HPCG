@@ -22,6 +22,7 @@
 #include <mpi.h>
 #endif
 
+#include "iostream"
 #include <vector>
 #include "ReportResults.hpp"
 #include "YAML_Element.hpp"

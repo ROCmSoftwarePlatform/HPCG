@@ -1,4 +1,4 @@
-
+  
 //@HEADER
 // ***************************************************
 //
@@ -21,6 +21,7 @@
 #include <fstream>
 
 #include <cmath>
+ #include <iostream>
 
 #include "hpcg.hpp"
 
@@ -28,9 +29,12 @@
 #include "mytimer.hpp"
 #include "ComputeSPMV.hpp"
 #include "ComputeMG.hpp"
+ #include "ComputeMG_ref.hpp"
 #include "ComputeDotProduct.hpp"
 #include "ComputeWAXPBY.hpp"
-
+#include "OptimizeProblem.hpp"
+#include "iostream"
+ using namespace std;
 
 // Use TICK and TOCK to time a code section in MATLAB-like fashion
 #define TICK()  t0 = mytimer() //!< record current time in 't0'
@@ -56,7 +60,7 @@
 
   @see CG_ref()
 */
-int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
+int CG(SparseMatrix & A, SparseMatrix &A_ref, CGData & data, const Vector & b, Vector & x,
     const int max_iter, const double tolerance, int & niters, double & normr, double & normr0,
     double * times, bool doPreconditioning) {
 
@@ -74,6 +78,13 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
   Vector & z = data.z; // Preconditioned residual vector
   Vector & p = data.p; // Direction vector (in MPI mode ncol>=nrow)
   Vector & Ap = data.Ap;
+
+  //Create r_copy and z_copy to copy r and z vectors respectively.
+  Vector r_copy;
+  r_copy.values = new double[A.localNumberOfRows];
+  Vector z_copy;
+  z_copy.values = new double[A.localNumberOfRows];
+
 
   if (!doPreconditioning && A.geom->rank==0) HPCG_fout << "WARNING: PERFORMING UNPRECONDITIONED ITERATIONS" << std::endl;
 
@@ -96,11 +107,39 @@ int CG(const SparseMatrix & A, CGData & data, const Vector & b, Vector & x,
   normr0 = normr;
 
   // Start iterations
-
   for (int k=1; k<=max_iter && normr/normr0 > tolerance; k++ ) {
     TICK();
     if (doPreconditioning)
-      ComputeMG(A, r, z); // Apply preconditioner
+    {
+      // Rearrange r_copy and z_copy according to the color ordering.
+      for(int i = 0; i < A.localNumberOfRows; i++)
+      {
+        r_copy.values[i] = r.values[A_ref.colors[i]];
+        z_copy.values[i] = z.values[A_ref.colors[i]];
+      }
+      r_copy.localLength = r.localLength;
+      z_copy.localLength = z.localLength;
+
+      // Call ComputeMG with reordered r_copy, z_copy and reference sparse matrix.
+      ComputeMG(A_ref, r_copy, z_copy); // Apply preconditioner
+      
+      /* Restore the z_ncol vector from z_copy. Restore back the MgData from reference sparse matrix 
+      to A matrix. */
+      if(A.level != 3)
+      {
+        for(int i = 0; i < A.localNumberOfRows; i++)
+        {
+             z.values[A_ref.colors[i]] = z_copy.values[i];
+             A.mgData->Axf->values[A_ref.colors[i]] = A_ref.mgData->Axf->values[i];
+        }
+        for(int i = 0; i <A.mgData->rc->localLength; i++)
+        {
+           A.mgData->rc->values[A_ref.Ac->colors[i]] = A_ref.mgData->rc->values[i];
+           A.mgData->xc->values[A_ref.Ac->colors[i]] = A_ref.mgData->xc->values[i];
+        }
+      }
+    }
+    
     else
       CopyVector (r, z); // copy r to z (no preconditioning)
     TOCK(t5); // Preconditioner apply time
