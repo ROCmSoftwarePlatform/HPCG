@@ -179,6 +179,7 @@ int main(int argc, char * argv[]) {
   InitializeSparseCGData(A_ref, data_ref);
 
 
+
   ////////////////////////////////////
   // Reference SpMV+MG Timing Phase //
   ////////////////////////////////////
@@ -243,21 +244,27 @@ int main(int argc, char * argv[]) {
   // Call user-tunable set up function.
   double t7 = mytimer();
 
-   
+  /*make the void pointer optimizationdata in every grid level to refer to the 
+  correspomding A_ref sparse matrix of the same grid level*/
+  A.optimizationData = &A_ref;
+  A.Ac->optimizationData = A_ref.Ac;
+  A.Ac->Ac->optimizationData = A_ref.Ac->Ac;
+  A.Ac->Ac->Ac->optimizationData = A_ref.Ac->Ac->Ac;
+  
+
   /* call OptimizeProblem to all grid levels so the reference matrix is reordered 
   based on Luby's color reordering algorithm*/
-  OptimizeProblem(A, A_ref);
-  OptimizeProblem(*A.Ac, *A_ref.Ac);
-  OptimizeProblem(*A.Ac->Ac, *A_ref.Ac->Ac);
-  OptimizeProblem(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
+  OptimizeProblem(A, *(SparseMatrix *)A.optimizationData);
+  OptimizeProblem(*A.Ac, *(SparseMatrix *)A.Ac->optimizationData);
+  OptimizeProblem(*A.Ac->Ac, *(SparseMatrix *)A.Ac->Ac->optimizationData);
+  OptimizeProblem(*A.Ac->Ac->Ac, *(SparseMatrix *)A.Ac->Ac->Ac->optimizationData);
 
   /* Call Mgdata_copy to copy the necessary MgData values from A to A_ref according
   to the coloring order*/
-  Mgdata_copy(A, A_ref);
-  Mgdata_copy(*A.Ac, *A_ref.Ac);
-  Mgdata_copy(*A.Ac->Ac, *A_ref.Ac->Ac);
-  Mgdata_copy(*A.Ac->Ac->Ac, *A_ref.Ac->Ac->Ac);
-
+  Mgdata_copy(A, *(SparseMatrix *)A.optimizationData);
+  Mgdata_copy(*A.Ac, *(SparseMatrix *)A.Ac->optimizationData);
+  Mgdata_copy(*A.Ac->Ac, *(SparseMatrix *)A.Ac->Ac->optimizationData);
+  Mgdata_copy(*A.Ac->Ac->Ac, *(SparseMatrix *)A.Ac->Ac->Ac->optimizationData);
 
   t7 = mytimer() - t7;
   times[7] = t7;
@@ -279,10 +286,10 @@ int main(int argc, char * argv[]) {
 #endif
   TestCGData testcg_data;
   testcg_data.count_pass = testcg_data.count_fail = 0;
-  TestCG(A, geom, data, b, x, testcg_data);
+  TestCG(*(SparseMatrix *)A.optimizationData, geom, data_ref, b, x, testcg_data);
 
   TestSymmetryData testsymmetry_data;
-  TestSymmetry(A, A_ref, b, xexact, testsymmetry_data);
+  TestSymmetry(*(SparseMatrix *)A.optimizationData, b, xexact, testsymmetry_data);
 
 #ifdef HPCG_DEBUG
   if (rank==0) HPCG_fout << "Total validation (TestCG and TestSymmetry) execution time in main (sec) = " << mytimer() - t1 << endl;
@@ -312,7 +319,7 @@ int main(int argc, char * argv[]) {
   for (int i=0; i< numberOfCalls; ++i) {
     ZeroVector(x); // start x at all zeros
     double last_cummulative_time = opt_times[0];
-    ierr = CG(A, A_ref, data, b, x, optMaxIters, refTolerance, niters, normr, normr0, &opt_times[0], true);
+    ierr = CG(*(SparseMatrix *)A.optimizationData, data_ref, b, x, optMaxIters, refTolerance, niters, normr, normr0, &opt_times[0], true);
     if (ierr) ++err_count; // count the number of errors in CG
     if (normr / normr0 > refTolerance) ++tolerance_failures; // the number of failures to reduce residual
 
@@ -364,7 +371,7 @@ int main(int argc, char * argv[]) {
 
   for (int i=0; i< numberOfCgSets; ++i) {
     ZeroVector(x); // Zero out x
-    ierr = CG( A, A_ref, data, b, x, optMaxIters, optTolerance, niters, normr, normr0, &times[0], true);
+    ierr = CG(*(SparseMatrix *)A.optimizationData, data_ref, b, x, optMaxIters, optTolerance, niters, normr, normr0, &times[0], true);
     if (ierr) HPCG_fout << "Error in call to CG: " << ierr << ".\n" << endl;
     if (rank==0) HPCG_fout << "Call [" << i << "] Scaled Residual [" << normr/normr0 << "]" << endl;
     testnorms_data.values[i] = normr/normr0; // Record scaled residual from this run
@@ -390,7 +397,6 @@ int main(int argc, char * argv[]) {
   ReportResults(A, numberOfMgLevels, numberOfCgSets, refMaxIters, optMaxIters, &times[0], testcg_data, testsymmetry_data, testnorms_data, global_failure, quickPath);
 
   // Clean up
-  free_refmatrix_m(A_ref);
   DeleteMatrix(A); // This delete will recursively delete all coarse grid data
   DeleteCGData(data);
   DeleteVector(x);
@@ -399,7 +405,6 @@ int main(int argc, char * argv[]) {
   DeleteVector(x_overlap);
   DeleteVector(b_computed);
   delete [] testnorms_data.values;
-
 
   HPCG_Finalize();
 

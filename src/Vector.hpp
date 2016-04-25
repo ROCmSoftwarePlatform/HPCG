@@ -23,8 +23,7 @@
 #include <cassert>
 #include <cstdlib>
 #include "Geometry.hpp"
-#include "iostream"
- using namespace std;
+
 struct Vector_STRUCT {
   local_int_t localLength;  //!< length of local portion of the vector
   double * values;          //!< array of values

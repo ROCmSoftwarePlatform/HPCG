@@ -24,7 +24,6 @@
 #include <map>
 #include <vector>
 #include <cassert>
-#include <iostream>
 #include "Geometry.hpp"
 #include "Vector.hpp"
 #include "MGData.hpp"
@@ -57,7 +56,7 @@ struct SparseMatrix_STRUCT {
   mutable struct SparseMatrix_STRUCT * Ac; // Coarse grid matrix
   mutable MGData * mgData; // Pointer to the coarse level data for this fine matrix
   void * optimizationData;  // pointer that can be used to store implementation-specific data
-  int level;
+  int level; // save the grid level
 
 #ifndef HPCG_NO_MPI
   local_int_t numberOfExternalValues; //!< number of entries that are external to this process
@@ -98,7 +97,6 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.isSpmvOptimized       = true;
   A.isMgOptimized      = true;
   A.isWaxpbyOptimized     = true;
-  A.level = 0;
 
 #ifndef HPCG_NO_MPI
   A.numberOfExternalValues = 0;
@@ -171,8 +169,7 @@ inline void DeleteMatrix(SparseMatrix & A) {
 
   if (A.geom!=0) { delete A.geom; A.geom = 0;}
   if (A.Ac!=0) { DeleteMatrix(*A.Ac); delete A.Ac; A.Ac = 0;} // Delete coarse matrix
-  if (A.mgData!=0) {
-   DeleteMGData(*A.mgData); delete A.mgData; A.mgData = 0;} // Delete MG data
+  if (A.mgData!=0) { DeleteMGData(*A.mgData); delete A.mgData; A.mgData = 0;} // Delete MG data
   return;
 }
 

@@ -23,7 +23,7 @@
 #include <cstdlib>
 #include <iostream>
 
-int OptimizeProblem(SparseMatrix & A,SparseMatrix & A_ref);
+int OptimizeProblem(const SparseMatrix & A,SparseMatrix & A_ref);
 void lubys_graph_coloring (int c,int *row_offset,int *col_index, std::vector<local_int_t> &colors,int *random, std::vector<local_int_t> &temp);
 void Mgdata_copy(SparseMatrix &A, SparseMatrix &A_ref);
 void copy_value( std::vector<local_int_t> &dest,  std::vector<local_int_t> &source);
