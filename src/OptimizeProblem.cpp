@@ -351,17 +351,11 @@ int OptimizeProblem(const SparseMatrix *A_) {
     for (int i = 0; i < A.totalNumberOfRows; i++) {
       for (int j = 0; j < A.nonzerosInRow[i]; j++) {
         A_->fcol[k] = A.mtxIndL[i][j];
-        k++;
-      }
-    }
-
-    k = 0;
-    for (int i = 0; i < A.totalNumberOfRows; i++) {
-      for (int j = 0; j < A.nonzerosInRow[i]; j++) {
         A_->fval[k] = (float)A.matrixValues[i][j];
         k++;
       }
     }
+
     HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(A, (clsparseCsrMatrix&)A_->Od_A, A_->fcol, A_->frowOff);
 
     clEnqueueWriteBuffer(HPCG_OCL::OCL::getOpenCL()->getCommandQueue(), A_->Od_A.values, CL_TRUE, 0,
@@ -409,13 +403,6 @@ int OptimizeProblem(const SparseMatrix *A_) {
     for (int i = 0; i < A_ref.totalNumberOfRows; i++) {
       for (int j = 0; j < A_ref.nonzerosInRow[i]; j++) {
         A_ref.matrixValues[i][j] = (double)A_->fval[k];
-        k++;
-      }
-    }
-
-    k = 0;
-    for (int i = 0; i < A_ref.totalNumberOfRows; i++) {
-      for (int j = 0; j < A_ref.nonzerosInRow[i]; j++) {
         A_ref.mtxIndL[i][j] = A_->fcol[k];
         k++;
       }

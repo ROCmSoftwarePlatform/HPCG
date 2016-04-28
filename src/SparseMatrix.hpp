@@ -78,11 +78,11 @@ struct SparseMatrix_STRUCT {
 
   double *val;
   clsparseCreateResult createResult;
-  cldenseVector d_p, d_Ap, d_b, d_r, d_x;
+  cldenseVector d_p, d_Ap, d_b, d_r, d_x, dx, dAxf;
   clsparseCsrMatrix d_A;
   clsparseScalar d_alpha, d_beta, d_normr, d_minus; 
   clsparseScalar d_rtz, d_oldrtz, d_minusAlpha, d_pAp;
-  clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref;
+  clsparseCsrMatrix Od_A, d_Q, d_Qt, d_A_ref, dA;
   float *fval;
   int *fcol, *frowOff;
 

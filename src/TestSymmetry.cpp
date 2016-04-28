@@ -164,7 +164,7 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   z_copy.localLength = z_ncol.localLength;
 
   // Call ComputeMG with reordered r_copy, z_copy and reference sparse matrix. 
-  ierr = ComputeMG(A_ref, r_copy, z_copy); // z_ncol = Minv*y_ncol
+  ierr = ComputeMG(A, A_ref, r_copy, z_copy); // z_ncol = Minv*y_ncol
 
   // Restore the z_ncol vector from z_copy. 
   for(int i = 0; i < A_ref.localNumberOfRows; i++)
@@ -199,7 +199,7 @@ int TestSymmetry(SparseMatrix &A, Vector &b, Vector &xexact, TestSymmetryData &t
   z_copy.localLength = z_ncol.localLength;
 
   // Call ComputeMG with reordered r_copy, z_copy and reference sparse matrix. 
-  ierr = ComputeMG(A_ref, r_copy, z_copy); // z_ncol = Minv*x_ncol
+  ierr = ComputeMG(A, A_ref, r_copy, z_copy); // z_ncol = Minv*x_ncol
 
   /* Restore the z_ncol vector from z_copy. Restore back the MgData from reference sparse matrix 
   to A matrix. */

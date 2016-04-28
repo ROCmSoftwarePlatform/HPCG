@@ -86,6 +86,7 @@ int clsparse_setup(SparseMatrix &h_A) {
   clsparseInitCsrMatrix(&h_A.d_Q);
   clsparseInitCsrMatrix(&h_A.d_Qt);
   clsparseInitCsrMatrix(&h_A.d_A_ref);
+  clsparseInitCsrMatrix(&h_A.dA);
 
   h_A.fval = new float[h_A.totalNumberOfNonzeros];
   h_A.fcol = new int[h_A.totalNumberOfNonzeros];
@@ -110,6 +111,8 @@ int clsparse_setup(SparseMatrix &h_A) {
     }
   }
   HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, h_A.d_A, col, rowOff);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initCsrMatrix(h_A, h_A.dA, col, rowOff);
+  
 
   // This function allocates memory for rowBlocks structure. If not called
   // the structure will not be calculated and clSPARSE will run the vectorized
@@ -121,6 +124,8 @@ int clsparse_setup(SparseMatrix &h_A) {
   clsparseInitVector(&h_A.d_b);
   clsparseInitVector(&h_A.d_r);
   clsparseInitVector(&h_A.d_x);
+  clsparseInitVector(&h_A.dx);
+  clsparseInitVector(&h_A.dAxf);
 
   clsparseInitScalar(&h_A.d_alpha);
   clsparseInitScalar(&h_A.d_beta);
@@ -136,6 +141,8 @@ int clsparse_setup(SparseMatrix &h_A) {
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_b,  h_A.d_A.num_rows);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_r,  h_A.d_A.num_rows);
   HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.d_x,  h_A.d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.dx,  h_A.d_A.num_rows);
+  HPCG_OCL::OCL::getOpenCL()->clsparse_initDenseVector(h_A.dAxf,  h_A.d_A.num_rows);
 
   // d_x.num_values = d_A.num_rows;
   double one = 1.0;
@@ -274,7 +281,7 @@ int CG(SparseMatrix &A, CGData &data, const Vector &b, Vector &x,
       z_copy.localLength = z.localLength;
 
       // Call ComputeMG with reordered r_copy, z_copy and reference sparse matrix.
-      ComputeMG(A_ref, r_copy, z_copy); // Apply preconditioner
+      ComputeMG(A, A_ref, r_copy, z_copy); // Apply preconditioner
       
       /* Restore the z_ncol vector from z_copy. Restore back the MgData from reference sparse matrix 
       to A matrix. */
