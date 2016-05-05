@@ -92,6 +92,7 @@ cl_mem  clNonzerosInRow;
 cl_mem  clMatrixDiagonal;
 cl_mem  clRv;
 cl_mem  clXv;
+cl_mem  clColors;
 
 double* mtxDiagonal;
 double* mtxValue;
@@ -148,6 +149,7 @@ inline void InitializeSparseMatrix(SparseMatrix & A, Geometry * geom) {
   A.matrixIndL = NULL;
   A.clRv = NULL;
   A.clXv = NULL;
+  A.clColors = NULL;
 #endif
   A.mgData = 0; // Fine-to-coarse grid transfer initially not defined.
   A.Ac =0;

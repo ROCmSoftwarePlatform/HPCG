@@ -1,7 +1,7 @@
 #pragma OPENCL EXTENSION cl_khr_fp64 : enable
 __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
                     __global char *nonzerosInRow, __global double *matrixDiagonal,
-                    __global double *rv, __global double *xv, int offset) {
+                    __global double *rv, __global double *xv, int offset, __global int *Colors) {
   __local double temp[32];
   int idx = get_group_id(0);
   int ldx = get_local_id(0);
@@ -10,7 +10,7 @@ __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
   temp[ldx] = 0.0;
   if (ldx < currentNumberOfNonzeros) {
     int curCol = mtxIndL[(idx + offset) * 27 + ldx];
-    temp[ldx] = matrixValues[(idx + offset) * 27 + ldx] * xv[curCol];
+    temp[ldx] = matrixValues[(idx + offset) * 27 + ldx] * xv[Colors[curCol]];
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);
@@ -24,10 +24,10 @@ __kernel void SYMGS(__global double *matrixValues, __global int *mtxIndL,
   }
 
   if (0 == ldx) {
-    double sum = rv[idx + offset];
+    double sum = rv[Colors[idx + offset]];
     sum -= temp[ldx];
-    sum += xv[idx + offset] * matrixDiagonal[(idx + offset) * 27];
-    xv[idx + offset] = sum / matrixDiagonal[(idx + offset) * 27];
+    sum += xv[Colors[idx + offset]] * matrixDiagonal[(idx + offset) * 27];
+    xv[Colors[idx + offset]] = sum / matrixDiagonal[(idx + offset) * 27];
   }
 }
 

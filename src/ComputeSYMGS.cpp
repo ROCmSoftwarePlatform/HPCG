@@ -100,6 +100,7 @@ static void ComputeSYMGS_OCL(SparseMatrix &A, const Vector &r, Vector &x) {
   clSetKernelArg(kernel, 3, sizeof(cl_mem), (void *)&A.clMatrixDiagonal);
   clSetKernelArg(kernel, 4, sizeof(cl_mem), (void *)&A.clRv);
   clSetKernelArg(kernel, 5, sizeof(cl_mem), (void *)&A.clXv);
+  clSetKernelArg(kernel, 7, sizeof(cl_mem), (void *)&A.clColors);
 
   // forward sweep to be carried out in parallel.
   for (k = 1; k < (int)(A.counters.size()); k++) {

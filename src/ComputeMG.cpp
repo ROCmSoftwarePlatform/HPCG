@@ -56,31 +56,9 @@ void free_vector(Vector &v)
   delete [] v.values;
 }
 
-// copy the vector back to the original index after computation
-void copy_back_vectors(Vector &x, Vector &x_copy, std::vector<local_int_t> &colors, local_int_t nrows)
-{
-  for( int i = 0; i < nrows; i++)
-  {
-    x.values[colors[i]] = x_copy.values[i];
-  }
-}
-
-// rearrange the vector keeping the color vector as reference index
-void rearrange_vector(const Vector &x, Vector &x_copy, std::vector<local_int_t> &colors, local_int_t nrows)
-{
-  for(int i = 0; i < nrows; i++)
-  {
-    x_copy.values[i] = x.values[colors[i]];
-  }
-   x_copy.localLength = x.localLength;
-}
-
 int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, Vector & x) {
 
   assert(x.localLength==A.localNumberOfColumns); 
-
-  Vector r_copy; // rhs vector to be rearranged
-  r_copy.values = new double[A.localNumberOfRows];
 
   ZeroVector(x); 
   int ierr = 0;
@@ -89,25 +67,7 @@ int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, V
     int numberOfPresmootherSteps = A.mgData->numberOfPresmootherSteps;
     for (int i=0; i< numberOfPresmootherSteps; ++i) 
     {
-      Vector x_copy;
-      x_copy.values = new double[A.localNumberOfRows];
-
-      /* Rearrange x vector according to the color index order
-       and store it in x_copy */
-      rearrange_vector(x, x_copy, A_ref.colors, A_ref.localNumberOfRows);
-      
-      /* Rearrange rhs vector according to the color index order 
-      and store it in r_copy */
-      rearrange_vector(r, r_copy, A_ref.colors, A_ref.localNumberOfRows);
-      
-      /* call symgs by with reordered reference sparse matrix , rhs vector
-      and x vector */
-      ierr += ComputeSYMGS(A_ref, r_copy, x_copy);
-
-      /* copy back the x vector back to the original index*/
-      copy_back_vectors(x, x_copy, A_ref.colors, A.localNumberOfRows);
-     
-      free_vector(x_copy); // free the reordered x_copy vector
+      ierr += ComputeSYMGS(A_ref, r, x);
      }
     if (ierr!=0) return ierr;
     ierr = ComputeSPMV_ref(A, x, *A.mgData->Axf); if (ierr!=0) return ierr;
@@ -118,51 +78,15 @@ int ComputeMG(const SparseMatrix  & A, SparseMatrix &A_ref , const Vector & r, V
     int numberOfPostsmootherSteps = A.mgData->numberOfPostsmootherSteps;
     for (int i=0; i< numberOfPostsmootherSteps; ++i) 
     {
-      Vector x_copy;
-      x_copy.values = new double[A.localNumberOfRows];
-      
-      /* Rearrange x vector according to the color index order
-       and store it in x_copy */
-      rearrange_vector(r, r_copy, A_ref.colors, A_ref.localNumberOfRows);
-      
-      /* Rearrange rhs vector according to the color index order 
-      and store it in r_copy */
-      rearrange_vector(x, x_copy, A_ref.colors, A_ref.localNumberOfRows);
-      
-      /* call symgs by with reordered reference sparse matrix , rhs vector
-      and x vector */
-      ierr += ComputeSYMGS(A_ref, r_copy, x_copy);
-      
-      /* copy back the x vector back to the original index*/
-      copy_back_vectors(x, x_copy, A_ref.colors, A.localNumberOfRows);
-      
-      free_vector(x_copy);// free the reordered x_copy vector
+      ierr += ComputeSYMGS(A_ref, r, x);
     }
     if (ierr!=0) return ierr;
   }
   else {
-      Vector x_copy;
-      x_copy.values = new double[A.localNumberOfRows];
       
-      /* Rearrange x vector according to the color index order
-       and store it in x_copy */
-      rearrange_vector(r, r_copy, A_ref.colors, A_ref.localNumberOfRows);
-      
-      /* Rearrange rhs vector according to the color index order 
-      and store it in r_copy */
-      rearrange_vector(x, x_copy, A_ref.colors, A_ref.localNumberOfRows);
-      
-      /* call symgs by with reordered reference sparse matrix , rhs vector
-      and x vector */
-      ierr += ComputeSYMGS(A_ref, r_copy, x_copy);
-      
-      /* copy back the x vector back to the original index*/
-      copy_back_vectors(x, x_copy, A_ref.colors, A.localNumberOfRows);
-      
-      free_vector(x_copy);// free the reordered x_copy vector
+      ierr += ComputeSYMGS(A_ref, r, x);
+
       if (ierr!=0) return ierr;
   }
-  free_vector(r_copy); // free the reordered r_copy vector
-
   return 0;
 }

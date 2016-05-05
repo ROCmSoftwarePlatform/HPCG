@@ -183,6 +183,17 @@ int OCL::initBuffer(SparseMatrix &A) {
       std::cout << "create buffer failed. status:" << cl_status << std::endl;
     }
 
+    A_ref.clColors = clCreateBuffer(context,
+                                    CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
+                                    nrow * sizeof(local_int_t),
+                                    &A_ref.colors[0],
+                                    &cl_status);
+    if (CL_SUCCESS != cl_status || NULL == A_ref.clColors) {
+      std::cout << "create buffer failed. status:" << cl_status << std::endl;
+    }
+
+   
+
     Ac_ref = Ac_ref->Ac;
   }
 
