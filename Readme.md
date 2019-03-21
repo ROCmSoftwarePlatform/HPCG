@@ -1,5 +1,6 @@
-# HPCG#
-This repository holds the source of HPCG - High Performance Conjugate Gradient Benchmark with hcSPARSE and clSPARSE csrmv-adaptive integration. 
+# HPCG - Deprecated Software
+This repository holds the source of HPCG - High Performance Conjugate Gradient Benchmark with hcSPARSE and clSPARSE csrmv-adaptive integration. This is a depreacted ROCm software project and is no longer actively maintained.
+
 ### Pre-requisites ###
 * Linux 
 * [HCC Compiler](https://bitbucket.org/multicoreware/hcc/wiki/Home)
